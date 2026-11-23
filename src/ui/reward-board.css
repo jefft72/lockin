@@ -1,0 +1,130 @@
+/* The milestone overlay is a top-layer dialog, not part of the stage grid. */
+.board.reward-board {
+	--award-ink: #f3dfb4;
+	--award-muted: #c2ae8b;
+	--award-line: #514635;
+	display: block;
+	inset: 0;
+	margin: auto;
+	width: min(62rem, calc(100% - 2rem));
+	max-width: none;
+	max-height: calc(100% - 2rem);
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: var(--award-ink);
+	cursor: auto;
+	overflow: auto;
+}
+
+.board.reward-board:not([open]) {
+	display: none;
+}
+
+.board.reward-board::backdrop {
+	background: rgb(10 9 8 / 88%);
+	backdrop-filter: blur(7px);
+	cursor: pointer;
+}
+
+.reward-board .reward-board-panel {
+	display: grid;
+	width: 100%;
+	padding: clamp(1rem, 3vw, 2rem);
+	gap: clamp(1rem, 3.8vw, 3rem);
+	border: 1px solid var(--award-line);
+	border-radius: 1rem;
+	background: radial-gradient(ellipse at 50% 0, #292117, #151310 75%);
+	box-shadow:
+		inset 0 1px #66573f,
+		inset 0 -2px #0d0c0b;
+	animation: reward-board-arrive 360ms cubic-bezier(0.15, 0.8, 0.25, 1) both;
+}
+
+.reward-board .reward-board-header {
+	display: grid;
+	grid-template-columns: auto 1fr auto;
+	align-items: center;
+	gap: 0.6rem;
+	padding-bottom: 0.8rem;
+	border-bottom: 1px solid var(--award-line);
+	color: var(--award-muted);
+	font:
+		600 0.66rem / 1.5 ui-monospace,
+		monospace;
+	letter-spacing: 0.1em;
+}
+
+.reward-board .reward-board-chip {
+	color: #ffd684;
+	text-shadow: 0 0 0.9rem #fbbd66;
+}
+
+.reward-board .reward-board-count {
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+
+.reward-board .board-line {
+	justify-self: center;
+	color: var(--award-ink);
+	font-size: min(
+		calc(76vw / (var(--chars, 18) * 1.31)),
+		calc(53rem / (var(--chars, 18) * 1.31)),
+		9rem,
+		28svh
+	);
+}
+
+.reward-board .reward-board-live {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	clip-path: inset(50%);
+	overflow: hidden;
+	white-space: nowrap;
+}
+
+.reward-board .reward-board-footer {
+	display: flex;
+	justify-content: center;
+	padding-top: 0.8rem;
+	border-top: 1px solid var(--award-line);
+}
+
+.reward-board .reward-board-continue {
+	min-height: 2.75rem;
+	padding-inline: 1.1rem;
+	border: 1px solid var(--award-line);
+	border-radius: 0.4rem;
+	background: #241e15;
+	color: var(--award-ink);
+}
+
+.reward-board .reward-board-continue:hover {
+	background: #393022;
+}
+
+.reward-board .reward-board-continue:focus-visible {
+	outline: 2px solid #ffd684;
+	outline-offset: 3px;
+}
+
+@keyframes reward-board-arrive {
+	from {
+		opacity: 0;
+		transform: translateY(0.6rem) scale(0.985);
+	}
+
+	to {
+		opacity: 1;
+		transform: translateY(0) scale(1);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.reward-board .reward-board-panel {
+		animation: none;
+	}
+}
