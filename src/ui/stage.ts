@@ -61,7 +61,7 @@ export class Stage {
 		const keys = el(
 			"p",
 			{ class: "keys" },
-			"space start/pause · ↑↓ minutes · 0-9 type minutes · ←→ phase · r reset · b bank",
+			"space start/pause · ↑↓ minutes · 0-9 type minutes · ←→ phase · r reset · b bank · m mute",
 		);
 
 		const stepButton = (minutes: number) => {
@@ -116,7 +116,15 @@ export class Stage {
 			"section",
 			{ class: "stage" },
 			el("header", { class: "stage-header" }, phases, keys),
-			el("div", { class: "centre" }, this.clock.el, track, this.status, this.adjustRow, controls),
+			el(
+				"div",
+				{ class: "centre" },
+				// The checkpoint track shares the clock's box so it is exactly as wide.
+				el("div", { class: "readout" }, this.clock.el, track),
+				this.status,
+				this.adjustRow,
+				controls,
+			),
 			this.footer,
 		);
 		this.render(state, now, false);
