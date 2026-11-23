@@ -1,8 +1,9 @@
 import { spanText } from "../core/format.ts";
 import type { Audit, Ledger, LedgerEntry } from "../core/ledger.ts";
 import { REWARDS } from "../core/rewards.ts";
-import { recentDays, summarize } from "../core/stats.ts";
+import { type Day, recentDays, summarize } from "../core/stats.ts";
 import { MINUTE } from "../core/timer.ts";
+import { ACTIVITY_DAYS, BankInsights } from "./bank-insights.ts";
 import { button, el, reducedMotion } from "./dom.ts";
 import { FlipText } from "./flip-text.ts";
 
@@ -29,6 +30,7 @@ export class BankView {
 	private readonly total = new FlipText("0m");
 	private readonly today = el("p");
 	private readonly streak = el("p");
+	private readonly insights = new BankInsights();
 	private readonly chart = el("div", { class: "stacks", role: "img" });
 	private readonly list = el("ol", { class: "list" });
 	private readonly tabs = new Map<Tab, HTMLButtonElement>();
@@ -66,7 +68,7 @@ export class BankView {
 			"aside",
 			{ class: "bank", "aria-label": "bank" },
 			el("header", {}, el("p", {}, "bank"), this.total.el, this.today, this.streak),
-			this.chart,
+			el("div", { class: "bank-activity" }, this.chart, this.insights.el),
 			tabs,
 			this.list,
 			el(
@@ -94,7 +96,9 @@ export class BankView {
 			"streak ",
 			el("b", {}, `${summary.streakDays} ${summary.streakDays === 1 ? "day" : "days"}`),
 		);
-		this.renderChart(droppedId);
+		const days = recentDays(ledger, now, ACTIVITY_DAYS);
+		this.renderChart(days.slice(-DAYS_SHOWN), droppedId);
+		this.insights.render(days);
 		this.renderList();
 	}
 
@@ -109,8 +113,7 @@ export class BankView {
 		this.notice.textContent = text;
 	}
 
-	private renderChart(droppedId?: string): void {
-		const days = recentDays(this.ledger, this.now, DAYS_SHOWN);
+	private renderChart(days: readonly Day[], droppedId?: string): void {
 		const busiest = Math.max(...days.map((day) => day.focusMs)) / MINUTE;
 		const scale = Math.min(MAX_SCALE, CHART_HEIGHT / Math.max(busiest, 1));
 		const banked = days.reduce((total, day) => total + day.focusMs, 0);
