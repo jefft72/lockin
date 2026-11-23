@@ -26,6 +26,7 @@ import { Board } from "./ui/board.ts";
 import { button } from "./ui/dom.ts";
 import { NowPlayingView } from "./ui/now-playing.ts";
 import { Stage } from "./ui/stage.ts";
+import "./ui/study-view.css";
 
 /** How long typed digits keep accumulating into one number of minutes. */
 const TYPING_WINDOW_MS = 1500;
@@ -35,12 +36,13 @@ const BOARD_DELAY_MS = 1200;
 
 interface Prefs {
 	readonly sound: boolean;
+	readonly studyView: boolean;
 }
 
 function parsePrefs(value: unknown): Prefs | null {
 	if (typeof value !== "object" || value === null) return null;
-	const { sound } = value as Record<string, unknown>;
-	return typeof sound === "boolean" ? { sound } : null;
+	const { sound, studyView } = value as Record<string, unknown>;
+	return typeof sound === "boolean" ? { sound, studyView: studyView === true } : null;
 }
 
 /** Runs `task` now if the tab is showing, otherwise the next time it is. */
@@ -72,7 +74,9 @@ export function startApp(root: HTMLElement): void {
 
 	const prefsStore = jsonStore("lockin.prefs.v1", parsePrefs);
 	const chime = new Chime();
-	chime.enabled = prefsStore.load()?.sound ?? true;
+	const prefs = prefsStore.load();
+	chime.enabled = prefs?.sound ?? true;
+	let studyView = prefs?.studyView ?? false;
 	// Sound is only allowed after a gesture, so take the first one on offer.
 	// A run restored by a reload can then still chime when it ends.
 	for (const gesture of ["pointerdown", "keydown"] as const) {
@@ -96,6 +100,23 @@ export function startApp(root: HTMLElement): void {
 		selectPhase: (phase) => dispatch({ type: "selectPhase", phase }),
 	});
 
+	const viewButton = button("study view", {
+		class: "study-view-toggle",
+		title: "Hide distractions (V); Escape returns to the full dashboard",
+		"aria-keyshortcuts": "V",
+	});
+	const setStudyView = (enabled: boolean) => {
+		studyView = enabled;
+		root.toggleAttribute("data-study-view", enabled);
+		viewButton.setAttribute("aria-pressed", String(enabled));
+	};
+	const savePrefs = () => prefsStore.save({ sound: chime.enabled, studyView });
+	setStudyView(studyView);
+	viewButton.addEventListener("click", () => {
+		setStudyView(!studyView);
+		savePrefs();
+	});
+
 	const soundButton = button("");
 	const setSound = (on: boolean) => {
 		chime.enabled = on;
@@ -105,12 +126,12 @@ export function startApp(root: HTMLElement): void {
 	setSound(chime.enabled);
 	soundButton.addEventListener("click", () => {
 		setSound(!chime.enabled);
-		prefsStore.save({ sound: chime.enabled });
+		savePrefs();
 	});
 
 	const nowPlaying = new NowPlayingView((command) => music.send(command));
 	const music = watchNowPlaying((sample, at) => nowPlaying.update(sample, at));
-	stage.footer.append(nowPlaying.el, soundButton);
+	stage.footer.append(nowPlaying.el, viewButton, soundButton);
 
 	const bankStore = ledgerStore();
 	let ledger: Ledger = bankStore.read();
@@ -254,7 +275,11 @@ export function startApp(root: HTMLElement): void {
 		// flicker the timer between running and paused.
 		if (event.repeat && !event.key.startsWith("Arrow")) return;
 		const target = event.target;
-		if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return;
+		if (
+			target instanceof HTMLElement &&
+			(target.isContentEditable || target.closest("input, textarea, select"))
+		)
+			return;
 		const onButton = target instanceof HTMLButtonElement;
 		const step = (event.shiftKey ? 5 : 1) * MINUTE;
 		switch (event.key) {
@@ -277,6 +302,14 @@ export function startApp(root: HTMLElement): void {
 				if (phase) stage.actions.selectPhase(phase);
 				break;
 			}
+			case "Escape":
+				if (!studyView) return;
+				setStudyView(false);
+				savePrefs();
+				break;
+			case "v":
+				viewButton.click();
+				break;
 			case "r":
 				stage.actions.reset();
 				break;
