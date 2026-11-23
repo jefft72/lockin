@@ -8,8 +8,8 @@ const STAGGER_MS = 45;
 /** The big MM:SS readout, one split-flap cell per digit. */
 export class ClockView {
 	readonly el: HTMLElement;
-	private readonly minutesEl = el("span", { class: "group" });
-	private readonly secondsEl = el("span", { class: "group" });
+	private readonly minutesEl = el("span", { class: "group", "aria-hidden": "true" });
+	private readonly secondsEl = el("span", { class: "group", "aria-hidden": "true" });
 	private minutes: FlipCell[] = [];
 	private readonly seconds: FlipCell[];
 
@@ -18,7 +18,7 @@ export class ClockView {
 		this.seconds = [...digits.seconds].map((char) => new FlipCell(char));
 		this.secondsEl.append(...this.seconds.map((cell) => cell.el));
 		this.rebuildMinutes(digits.minutes);
-		const colon = el("span", { class: "colon" }, el("i"), el("i"));
+		const colon = el("span", { class: "colon", "aria-hidden": "true" }, el("i"), el("i"));
 		this.el = el(
 			"div",
 			{ class: "clock", role: "timer", "aria-live": "off" },

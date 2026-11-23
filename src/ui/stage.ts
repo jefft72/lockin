@@ -46,6 +46,8 @@ export class Stage {
 	private readonly presetButtons = new Map<number, HTMLButtonElement>();
 	private readonly adjustRow = el("div", { class: "row adjust" });
 	private readonly segments: HTMLElement[] = [];
+	private readonly stateLabel = el("span", { class: "state-label" });
+	private readonly phaseLabel = el("span", { class: "phase-label" });
 	private readonly status = el("p", { class: "status", "aria-live": "polite" });
 	private readonly toggleButton = button("start", { class: "primary" });
 	private readonly resetButton = button("reset");
@@ -66,7 +68,19 @@ export class Stage {
 		const keys = el(
 			"p",
 			{ class: "keys" },
-			"space start/pause · ↑↓ minutes · 0-9 type minutes · ←→ phase · r reset · b bank · m mute",
+			el("kbd", {}, "space"),
+			" start / pause ",
+			el("kbd", {}, "↑↓"),
+			" minutes ",
+			el("kbd", {}, "←→"),
+			" phase",
+		);
+		const identity = el(
+			"div",
+			{ class: "stage-identity" },
+			el("span", { class: "stage-mark", "aria-hidden": "true" }),
+			el("span", {}, "lockin"),
+			el("span", { class: "stage-edition" }, "focus instrument"),
 		);
 
 		const stepButton = (minutes: number) => {
@@ -133,12 +147,18 @@ export class Stage {
 		this.el = el(
 			"section",
 			{ class: "stage" },
-			el("header", { class: "stage-header" }, phases, keys),
+			el("header", { class: "stage-header" }, identity, keys),
 			el(
 				"div",
 				{ class: "centre" },
-				// The checkpoint track shares the clock's box so it is exactly as wide.
-				el("div", { class: "readout" }, this.clock.el, track),
+				phases,
+				el(
+					"div",
+					{ class: "readout" },
+					el("div", { class: "readout-head" }, this.phaseLabel, this.stateLabel),
+					this.clock.el,
+					track,
+				),
 				this.status,
 				this.adjustRow,
 				controls,
@@ -155,6 +175,10 @@ export class Stage {
 
 		this.clock.render(remainingMs(state, now), spin);
 		this.clock.el.classList.toggle("paused", paused);
+		this.el.dataset.phase = phase;
+		this.el.dataset.state = idle ? "ready" : paused ? "paused" : "running";
+		setText(this.stateLabel, idle ? "standby" : paused ? "paused" : "in progress");
+		setText(this.phaseLabel, `${PHASE_LABELS[phase]} timer`);
 
 		for (const [name, tab] of this.phaseButtons) {
 			tab.setAttribute("aria-pressed", String(name === phase));
@@ -198,20 +222,22 @@ export class Stage {
 		}, holdMs);
 	}
 
-	/** Blinks the stretch that was just completed. */
+	/** Gives the stretch that was just completed a single glow. */
 	markCheckpoint(index: number): void {
 		const segment = this.segments[index - 1];
 		if (!segment || reducedMotion()) return;
-		const blink = [1, 0, 1, 0, 1].map((opacity) => ({ opacity, easing: "step-end" }));
-		segment.animate(blink, { duration: 900 });
+		segment.animate(
+			[{ filter: "brightness(1.65)", transform: "scaleY(1.65)" }, { filter: "none" }],
+			{ duration: 560, easing: "cubic-bezier(.2,.7,.2,1)" },
+		);
 	}
 
-	/** Cuts the whole screen to white and back when a run ends. */
+	/** Lets the completion land with a warm pulse instead of a hard white flash. */
 	flash(): void {
 		if (reducedMotion()) return;
-		document.body.animate([{ filter: "invert(1)" }, { filter: "invert(0)" }], {
-			duration: 420,
-			easing: "step-end",
+		this.clock.el.animate([{ filter: "brightness(1.35)" }, { filter: "none" }], {
+			duration: 650,
+			easing: "ease-out",
 		});
 	}
 }

@@ -1,13 +1,14 @@
-/*
- * Nothing here is decoration. Black page, white digits, grey monospace labels.
- * The only element with any craft in it is the clock.
- */
+/* Lockin's hardware-inspired, phase-tinted focus instrument. */
 
 :root {
-	--fg: #fff;
-	--dim: #777;
-	--faint: #333;
-	--line: #1c1c1c;
+	--fg: #f1f3e9;
+	--dim: #a0a99f;
+	--faint: #737f75;
+	--line: #303932;
+	--surface: #151a17;
+	--accent: #d4f870;
+	--radius: 0.75rem;
+	--card: #171e19;
 	--ink-h: 0.7em;
 	--ink-top: 0.15em;
 	--seam: 0.014em;
@@ -28,8 +29,8 @@ body {
 
 body {
 	display: grid;
-	grid-template-columns: minmax(0, 1fr) 22rem;
-	background: #000;
+	grid-template-columns: minmax(0, 1fr) clamp(19.5rem, 27vw, 25rem);
+	background: #101211;
 	color: var(--dim);
 	font:
 		12px / 1.6 ui-monospace,
@@ -45,59 +46,139 @@ p {
 }
 
 button {
-	padding: 0;
-	border: 0;
+	padding: 0.35rem 0.55rem;
+	min-height: 2rem;
+	border: 1px solid transparent;
+	border-radius: 0.4rem;
 	background: none;
 	color: var(--dim);
 	font: inherit;
 	cursor: pointer;
+	transition:
+		background-color 140ms ease,
+		color 140ms ease,
+		border-color 140ms ease,
+		transform 140ms ease;
 }
 
 button:hover:enabled {
-	color: #bbb;
+	background-color: color-mix(in srgb, var(--fg) 6%, transparent);
+	color: var(--fg);
+}
+
+button:active:enabled {
+	transform: translateY(1px);
 }
 
 button[aria-pressed="true"],
 button.primary {
-	color: var(--fg);
+	color: var(--accent);
 }
 
 button:disabled {
-	color: var(--faint);
+	opacity: 0.4;
 	cursor: default;
 }
 
 button:focus-visible {
-	outline: 1px solid var(--fg);
-	outline-offset: 4px;
+	outline: 2px solid var(--accent);
+	outline-offset: 3px;
 }
 
 .row {
 	display: flex;
 	flex-wrap: wrap;
 	justify-content: center;
-	gap: 0 2ch;
+	gap: 0.25rem;
 }
 
 /* stage */
 
 .stage {
 	display: grid;
-	grid-template-rows: auto minmax(0, 1fr) auto;
+	grid-template-rows: auto minmax(26rem, 1fr) auto;
 	min-width: 0;
 	min-height: 0;
-	padding: 1.5rem 2rem;
+	padding: clamp(1rem, 2.5vw, 2.5rem);
+	overflow-y: auto;
+	background:
+		radial-gradient(
+			ellipse at 50% 44%,
+			color-mix(in srgb, var(--accent) 10%, transparent),
+			transparent 65%
+		),
+		linear-gradient(180deg, #101511, #101211);
+}
+
+.stage[data-phase="break"] {
+	--accent: #a9e7ff;
+}
+
+.stage[data-phase="longBreak"] {
+	--accent: #e6c1ff;
 }
 
 .stage-header {
 	display: flex;
+	align-items: center;
 	justify-content: space-between;
-	gap: 2ch;
+	gap: 1rem;
+	padding-bottom: 1rem;
+	border-bottom: 1px solid var(--line);
+}
+
+.stage-identity {
+	display: flex;
+	align-items: center;
+	gap: 0.65rem;
+	color: var(--fg);
+	font-size: 1.05rem;
+	font-weight: 800;
+	letter-spacing: -0.045em;
+	white-space: nowrap;
+}
+
+.stage-mark {
+	display: grid;
+	place-items: center;
+	width: 1.35rem;
+	height: 1.35rem;
+	border: 1px solid color-mix(in srgb, var(--accent) 48%, var(--line));
+	border-radius: 0.34rem;
+	background: color-mix(in srgb, var(--accent) 9%, var(--surface));
+}
+
+.stage-mark::before {
+	content: "";
+	width: 0.7rem;
+	height: 0.82rem;
+	background: var(--accent);
+	clip-path: polygon(64% 0, 0 58%, 43% 58%, 34% 100%, 100% 36%, 55% 36%);
+}
+
+.stage-edition {
+	padding-left: 0.65rem;
+	border-left: 1px solid var(--line);
+	color: var(--dim);
+	font-size: 0.62rem;
+	font-weight: 500;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
 }
 
 .keys {
-	color: var(--faint);
+	color: var(--dim);
 	text-align: right;
+	white-space: nowrap;
+}
+
+.keys kbd {
+	padding: 0.12rem 0.34rem;
+	border: 1px solid var(--line);
+	border-radius: 0.25rem;
+	background: var(--surface);
+	color: var(--fg);
+	font: inherit;
 }
 
 .centre {
@@ -105,18 +186,76 @@ button:focus-visible {
 	flex-direction: column;
 	align-items: center;
 	justify-content: center;
-	gap: 1.25rem;
+	gap: clamp(0.55rem, 2vh, 1.25rem);
 	min-height: 0;
+	padding: 0.5rem 0;
 	container-type: size;
+}
+
+.phases {
+	padding: 0.25rem;
+	border: 1px solid var(--line);
+	border-radius: 0.65rem;
+	background: #111612;
+}
+
+.phases button {
+	min-height: 2.05rem;
+	padding: 0.3rem clamp(0.65rem, 2vw, 1.1rem);
+}
+
+.phases button[aria-pressed="true"],
+.adjust button[aria-pressed="true"] {
+	border-color: color-mix(in srgb, var(--accent) 32%, var(--line));
+	background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+}
+
+.adjust button {
+	min-width: 2.15rem;
+	border-color: var(--line);
+	background: var(--surface);
+}
+
+.adjust button:first-child,
+.adjust button:nth-child(2),
+.adjust button:nth-last-child(-n + 2) {
+	color: var(--fg);
 }
 
 .adjust[inert] {
 	visibility: hidden;
 }
 
+.controls button {
+	min-width: 4.5rem;
+	min-height: 2.5rem;
+	padding-inline: 0.75rem;
+	border-color: var(--line);
+	background: var(--surface);
+}
+
+.controls .primary {
+	min-width: 7rem;
+	border-color: var(--accent);
+	background: var(--accent);
+	color: #17200d;
+	font-weight: 800;
+	box-shadow: 0 3px 0 color-mix(in srgb, var(--accent) 55%, #131916);
+}
+
+.controls .primary:hover:enabled {
+	background: color-mix(in srgb, var(--accent) 82%, #fff);
+	color: #17200d;
+}
+
+.controls .primary:active:enabled {
+	box-shadow: 0 1px 0 color-mix(in srgb, var(--accent) 55%, #131916);
+}
+
 .status {
-	height: 1.6em;
-	color: var(--fg);
+	min-height: 1.6em;
+	color: var(--accent);
+	text-align: center;
 }
 
 /* clock */
@@ -127,17 +266,19 @@ button:focus-visible {
 	gap: 0.07em;
 	color: var(--fg);
 	font-family: "Lockin Digits", "Arial Black", sans-serif;
-	font-size: min(21cqw, 62cqh);
+	font-size: min(17cqw, 41cqh, 9.5rem);
 	font-weight: 900;
 	font-stretch: 125%;
 	font-variant-numeric: tabular-nums;
 	line-height: 1;
 	user-select: none;
 	transition: color 200ms linear;
+	/* The time is still legible without the animated faces. */
+	--seam: max(1px, 0.012em);
 }
 
 .clock[data-wide="true"] {
-	font-size: min(17.5cqw, 62cqh);
+	font-size: min(14cqw, 41cqh, 9.5rem);
 }
 
 .clock.paused {
@@ -146,7 +287,7 @@ button:focus-visible {
 
 .group {
 	display: flex;
-	gap: 0.035em;
+	gap: 0.045em;
 }
 
 .colon {
@@ -154,13 +295,16 @@ button:focus-visible {
 	flex-direction: column;
 	justify-content: space-between;
 	height: var(--ink-h);
-	padding: calc(var(--ink-h) * 0.16) 0;
+	padding: calc(var(--ink-h) * 0.25) 0;
+	color: var(--accent);
 }
 
 .colon i {
-	width: 0.17em;
-	height: 0.17em;
+	width: 0.085em;
+	height: 0.085em;
+	border-radius: 18%;
 	background: currentColor;
+	box-shadow: 0 0 0.1em color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
 .flip {
@@ -180,7 +324,7 @@ button:focus-visible {
 	position: absolute;
 	inset: 0;
 	/* Opaque, so a falling flap hides the glyph behind it like a real card. */
-	background: #000;
+	background: var(--card);
 	backface-visibility: hidden;
 }
 
@@ -201,12 +345,88 @@ button:focus-visible {
 	text-align: center;
 }
 
-/* checkpoints */
+/* Clock housing and checkpoints */
 
 .readout {
 	display: flex;
 	flex-direction: column;
-	gap: 1.25rem;
+	gap: clamp(0.6rem, 1.8vw, 1.15rem);
+	padding: clamp(0.8rem, 2.4vw, 1.55rem);
+	border: 1px solid color-mix(in srgb, var(--accent) 17%, var(--line));
+	border-radius: 1.15rem;
+	background: linear-gradient(155deg, #161d17, #101411 70%);
+	box-shadow:
+		inset 0 1px 0 #ffffff0f,
+		0 0.9rem 3.5rem #0007;
+}
+
+.readout-head {
+	display: flex;
+	justify-content: space-between;
+	gap: 0.5rem;
+	color: var(--dim);
+	font-size: 0.63rem;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+}
+
+.state-label {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.42rem;
+	white-space: nowrap;
+}
+
+.state-label::before {
+	content: "";
+	width: 0.4rem;
+	height: 0.4rem;
+	border: 1px solid var(--faint);
+	border-radius: 50%;
+}
+
+.stage[data-state="running"] .state-label {
+	color: var(--accent);
+}
+
+.stage[data-state="running"] .state-label::before {
+	border-color: var(--accent);
+	background: var(--accent);
+	box-shadow: 0 0 0.5rem var(--accent);
+}
+
+.stage[data-state="paused"] .state-label::before {
+	border-color: #f0bd7d;
+	background: #f0bd7d;
+}
+
+.clock .flip {
+	width: calc(1ch + 0.1em);
+	height: calc(var(--ink-h) + 0.18em);
+	border-radius: 0.095em;
+	background: #090d0a;
+	box-shadow: 0 0.045em 0 #090c0a;
+}
+
+.clock .half {
+	border: 1px solid #ffffff14;
+	border-radius: inherit;
+}
+
+.clock .half.top {
+	background: linear-gradient(170deg, #2c362d, #202822 58%, #151b17);
+}
+
+.clock .half.bottom {
+	background: linear-gradient(180deg, #1a221c 45%, #161e18 57%, #202a22);
+}
+
+.clock .glyph {
+	top: calc(var(--ink-top) * -1 + 0.085em);
+}
+
+.clock.paused .colon {
+	color: var(--faint);
 }
 
 .checkpoints {
@@ -222,15 +442,17 @@ button:focus-visible {
 .checkpoints i {
 	position: relative;
 	flex: 1;
-	height: 3px;
+	height: 4px;
+	border-radius: 999px;
 	background: var(--line);
+	overflow: hidden;
 }
 
 .checkpoints i::after {
 	content: "";
 	position: absolute;
 	inset: 0;
-	background: var(--fg);
+	background: var(--accent);
 	transform: scaleX(var(--fill, 0));
 	transform-origin: 0 50%;
 	transition: transform 200ms linear;
@@ -238,10 +460,13 @@ button:focus-visible {
 
 .stage-footer {
 	display: flex;
-	align-items: flex-start;
+	align-items: center;
 	justify-content: flex-end;
-	gap: 4ch;
-	min-height: 1.6em;
+	flex-wrap: wrap;
+	gap: 0.4rem;
+	min-height: 2.5rem;
+	padding-top: 0.65rem;
+	border-top: 1px solid var(--line);
 }
 
 .stage-footer > button {
@@ -347,11 +572,13 @@ button:focus-visible {
 
 .bank {
 	display: grid;
-	grid-template-rows: auto auto auto minmax(0, 1fr) auto;
-	gap: 1.25rem;
+	grid-template-rows: auto auto auto minmax(3rem, 1fr) auto;
+	gap: 1rem;
 	min-height: 0;
-	padding: 1.5rem;
+	padding: clamp(1rem, 2vw, 1.6rem);
+	overflow-y: auto;
 	border-left: 1px solid var(--line);
+	background: #121713;
 }
 
 .bank b {
@@ -359,9 +586,17 @@ button:focus-visible {
 	font-weight: inherit;
 }
 
+.bank header > p:first-child {
+	color: var(--accent);
+	font-size: 0.65rem;
+	letter-spacing: 0.16em;
+	text-transform: uppercase;
+}
+
 .bank .total {
 	margin: 0.75rem 0 0.9rem;
-	font-size: 2.75rem;
+	font-size: clamp(2rem, 3.1vw, 3.05rem);
+	--card: #121713;
 }
 
 .stacks {
@@ -387,22 +622,25 @@ button:focus-visible {
 	gap: 2px;
 	height: 168px;
 	overflow: hidden;
-	border-bottom: 1px solid var(--faint);
+	border-bottom: 1px solid var(--line);
 	padding-bottom: 2px;
+	background: repeating-linear-gradient(to top, transparent 0 27px, #ffffff0c 27px 28px);
 }
 
 .stack i {
 	flex: none;
-	background: var(--fg);
+	border-radius: 0.19rem 0.19rem 0.06rem 0.06rem;
+	background: linear-gradient(0deg, #7eaa48, var(--accent));
 }
 
 .stack i.partial {
-	border: 1px solid var(--fg);
+	border: 1px solid var(--accent);
 	background: none;
 }
 
 .tabs {
 	justify-content: flex-start;
+	border-bottom: 1px solid var(--line);
 }
 
 .list {
@@ -418,6 +656,11 @@ button:focus-visible {
 	display: grid;
 	grid-template-columns: 5ch minmax(0, 1fr) 8ch 8ch;
 	gap: 1ch;
+}
+
+.list > li {
+	padding: 0.32rem 0;
+	border-bottom: 1px solid #ffffff0c;
 }
 
 .hash {
@@ -455,7 +698,7 @@ button:focus-visible {
 	align-items: center;
 	justify-content: center;
 	gap: 2rem;
-	background: #000;
+	background: radial-gradient(ellipse at center, #263226, #101411 62%);
 	cursor: pointer;
 }
 
@@ -466,7 +709,8 @@ button:focus-visible {
 .board-line {
 	display: flex;
 	gap: 0.06em;
-	color: var(--fg);
+	color: var(--accent);
+	--card: #151c16;
 	font-family: "Lockin Digits", "Arial Black", sans-serif;
 	/* Each cell is 1.25em plus its gap: size the line so any label spans the screen. */
 	font-size: min(calc(88vw / (var(--chars, 18) * 1.31)), 22vh);
@@ -490,12 +734,13 @@ button:focus-visible {
 
 	body {
 		grid-template-columns: minmax(0, 1fr);
-		grid-template-rows: 100svh auto;
+		grid-template-rows: minmax(36rem, 100svh) auto;
 		overflow: visible;
 	}
 
 	.stage {
-		padding: 1.5rem;
+		padding: clamp(0.8rem, 3vw, 1.5rem);
+		overflow-y: visible;
 	}
 
 	.keys {
@@ -503,8 +748,7 @@ button:focus-visible {
 	}
 
 	.stage-footer {
-		flex-wrap: wrap;
-		gap: 1rem 4ch;
+		gap: 0.4rem;
 	}
 
 	.now-playing {
@@ -516,6 +760,7 @@ button:focus-visible {
 		flex-direction: column;
 		border-top: 1px solid var(--line);
 		border-left: 0;
+		overflow: visible;
 	}
 
 	.list {
@@ -523,7 +768,27 @@ button:focus-visible {
 	}
 }
 
+@media (max-width: 420px) {
+	.adjust {
+		max-width: 18rem;
+	}
+
+	.adjust button {
+		min-width: 1.65rem;
+		padding-inline: 0.25rem;
+	}
+
+	.clock {
+		font-size: min(16.5cqw, 41cqh);
+	}
+
+	.clock[data-wide="true"] {
+		font-size: min(13.3cqw, 41cqh);
+	}
+}
+
 @media (prefers-reduced-motion: reduce) {
+	button,
 	.clock,
 	.checkpoints,
 	.checkpoints i::after {
