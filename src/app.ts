@@ -16,7 +16,7 @@ import {
 	type TimerState,
 } from "./core/timer.ts";
 import { Chime } from "./platform/chime.ts";
-import { ledgerStore } from "./platform/ledger-store.ts";
+import { type DepositResult, ledgerStore } from "./platform/ledger-store.ts";
 import { watchNowPlaying } from "./platform/now-playing-client.ts";
 import { jsonStore } from "./platform/storage.ts";
 import { startTicker } from "./platform/ticker.ts";
@@ -41,6 +41,20 @@ function parsePrefs(value: unknown): Prefs | null {
 	if (typeof value !== "object" || value === null) return null;
 	const { sound } = value as Record<string, unknown>;
 	return typeof sound === "boolean" ? { sound } : null;
+}
+
+/** Runs `task` now if the tab is showing, otherwise the next time it is. */
+function whenVisible(task: () => void): void {
+	if (!document.hidden) {
+		task();
+		return;
+	}
+	const onChange = () => {
+		if (document.hidden) return;
+		document.removeEventListener("visibilitychange", onChange);
+		task();
+	};
+	document.addEventListener("visibilitychange", onChange);
 }
 
 function download(name: string, text: string): void {
@@ -119,15 +133,24 @@ export function startApp(root: HTMLElement): void {
 	}
 
 	async function bankSession(session: SessionRecord): Promise<void> {
-		const { before, after } = await bankStore.deposit(session);
+		let result: DepositResult;
+		try {
+			result = await bankStore.deposit(session);
+		} catch {
+			// Storage is full or blocked. Say so rather than lose the session quietly.
+			bank.say(`could not bank ${spanText(session.focusMs)}: browser storage refused it`);
+			return;
+		}
+		const { before, after } = result;
 		showLedger(after, session.id);
 		// If another tab banked this same session first, nothing is new here and
 		// that tab does the celebrating.
 		if (after === before) return;
 		stage.announce(`banked ${spanText(session.focusMs)}`);
-		// Let the block land on its stack before the board covers the screen.
 		const rewards = newlyEarned(before, after).map((reward) => reward.label);
-		setTimeout(() => board.announce(rewards), BOARD_DELAY_MS);
+		// Sessions usually end with this tab in the background. Hold the board
+		// until someone is looking, then let the block land before it covers the screen.
+		whenVisible(() => setTimeout(() => board.announce(rewards), BOARD_DELAY_MS));
 	}
 
 	async function importLedger(file: File): Promise<void> {
@@ -227,6 +250,9 @@ export function startApp(root: HTMLElement): void {
 			event.preventDefault();
 			return;
 		}
+		// A held key repeats. Only the arrows should: holding space must not
+		// flicker the timer between running and paused.
+		if (event.repeat && !event.key.startsWith("Arrow")) return;
 		const target = event.target;
 		if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return;
 		const onButton = target instanceof HTMLButtonElement;

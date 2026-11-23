@@ -101,6 +101,20 @@ test("space starts the timer even right after a mouse click", async ({ app }) =>
 	await expectClock(app, "44:00");
 });
 
+test("holding a key down does not flicker the timer", async ({ app }) => {
+	await app.keyboard.down("Space");
+	for (let i = 0; i < 5; i++) await app.keyboard.down("Space");
+	await app.keyboard.up("Space");
+	await expect(app.getByRole("button", { name: "pause" })).toBeVisible();
+
+	// Arrows are the exception: holding one keeps stepping.
+	await app.keyboard.press("r");
+	await app.keyboard.down("ArrowUp");
+	for (let i = 0; i < 4; i++) await app.keyboard.down("ArrowUp");
+	await app.keyboard.up("ArrowUp");
+	await expectClock(app, "30:00");
+});
+
 test("a session survives a reload and keeps the right time", async ({ app }) => {
 	await app.keyboard.press("Space");
 	await advance(app, 10 * MINUTE);
