@@ -1,15 +1,14 @@
 import { defineConfig } from "vitest/config";
 import { spotifyBridgePlugin } from "./bridge/vite-plugin.ts";
 
-// The app is only ever served on loopback: the Spotify bridge drives a local
-// app, and a fixed port keeps localStorage (the bank) on one stable origin.
+// This is the development server only. The built app is served by `study`
+// (see cli/), on its own port so the two never share a bank.
 export default defineConfig({
 	server: { host: "127.0.0.1", port: 2526, strictPort: true },
-	preview: { host: "127.0.0.1", port: 2525, strictPort: true },
 	build: { target: "es2023" },
 	plugins: [spotifyBridgePlugin()],
 	test: {
-		include: ["src/**/*.test.ts", "bridge/**/*.test.ts"],
+		include: ["src/**/*.test.ts", "bridge/**/*.test.ts", "cli/**/*.test.ts"],
 		environment: "node",
 	},
 });

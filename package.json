@@ -6,10 +6,19 @@
 	"engines": {
 		"node": ">=24"
 	},
+	"bin": {
+		"study": "build/cli/study.js"
+	},
+	"files": [
+		"dist",
+		"build"
+	],
 	"scripts": {
 		"dev": "vite",
-		"start": "vite build && vite preview --open",
-		"build": "vite build",
+		"start": "npm run build && node build/cli/study.js",
+		"build": "vite build && tsc -p tsconfig.cli.json",
+		"prepack": "npm run build",
+		"install:global": "npm pack && npm install -g ./lockin-$npm_package_version.tgz",
 		"typecheck": "tsc --noEmit",
 		"lint": "biome check . && tsc --noEmit",
 		"format": "biome check --write .",

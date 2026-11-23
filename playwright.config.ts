@@ -16,9 +16,10 @@ export default defineConfig({
 		trace: "retain-on-failure",
 	},
 	projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
-	// The tests run against the production build, the same thing `npm start` serves.
+	// The tests run against the production build on the production server: the
+	// same thing the `study` command starts.
 	webServer: {
-		command: `npm run build && npx vite preview --port ${PORT}`,
+		command: `npm run build && node build/cli/study.js serve --port ${PORT}`,
 		url: ORIGIN,
 		reuseExistingServer: !process.env.CI,
 	},

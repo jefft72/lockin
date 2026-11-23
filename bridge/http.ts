@@ -4,12 +4,17 @@ import type { SpotifyBridge } from "./spotify.ts";
 
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"]);
 
-function hostname(host: string | undefined): string | null {
-	if (!host) return null;
+/**
+ * Whether a request's Host header names this machine. A page on another site
+ * can be pointed at 127.0.0.1 by DNS rebinding, but it cannot change the Host
+ * it sends, so checking it keeps such pages out.
+ */
+export function isLoopbackHost(host: string | undefined): boolean {
+	if (!host) return false;
 	try {
-		return new URL(`http://${host}`).hostname;
+		return LOOPBACK_HOSTS.has(new URL(`http://${host}`).hostname);
 	} catch {
-		return null;
+		return false;
 	}
 }
 
@@ -23,8 +28,7 @@ function hostname(host: string | undefined): string | null {
  */
 function refusal(request: IncomingMessage, isCommand: boolean): number | null {
 	const host = request.headers.host;
-	const name = hostname(host);
-	if (name === null || !LOOPBACK_HOSTS.has(name)) return 403;
+	if (!isLoopbackHost(host)) return 403;
 	if (!isCommand) return null;
 	if (request.headers[BRIDGE_HEADER] !== "1") return 403;
 	const origin = request.headers.origin;

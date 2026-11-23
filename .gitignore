@@ -6,3 +6,5 @@ playwright-report/
 .context/
 .DS_Store
 *.tsbuildinfo
+build/
+*.tgz

@@ -1,0 +1,13 @@
+{
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		"lib": ["ES2023"],
+		"types": ["node"],
+		"noEmit": false,
+		"rootDir": ".",
+		"outDir": "build",
+		"rewriteRelativeImportExtensions": true
+	},
+	"include": ["cli"],
+	"exclude": ["**/*.test.ts"]
+}
