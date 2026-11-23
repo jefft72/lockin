@@ -11,6 +11,7 @@ import {
 } from "../core/timer.ts";
 import { ClockView } from "./clock.ts";
 import { button, el, reducedMotion, setText } from "./dom.ts";
+import "./stage.css";
 
 export interface StageActions {
 	toggle(): void;
@@ -34,8 +35,54 @@ const WHEEL_IDLE_MS = 250;
 
 const PRESETS = [15, 25, 45, 60, 90];
 const STEPS = [-5, -1, 1, 5];
+const SVG = "http://www.w3.org/2000/svg";
 
-/** The left side of the screen: phase tabs, the clock, checkpoints and controls. */
+function printWheel(): {
+	wheel: SVGSVGElement;
+	strokes: SVGPathElement[];
+	percent: SVGTextElement;
+} {
+	const wheel = document.createElementNS(SVG, "svg");
+	wheel.classList.add("stage-wheel");
+	wheel.setAttribute("viewBox", "0 0 220 220");
+	wheel.setAttribute("aria-hidden", "true");
+	const strokes: SVGPathElement[] = [];
+	const radius = 88;
+	const point = (degrees: number) => {
+		const radians = (degrees * Math.PI) / 180;
+		return `${110 + radius * Math.cos(radians)} ${110 + radius * Math.sin(radians)}`;
+	};
+	for (let segment = 0; segment < STRETCHES; segment++) {
+		const start = segment * (360 / STRETCHES) - 87;
+		const end = (segment + 1) * (360 / STRETCHES) - 93;
+		const draw = `M ${point(start)} A ${radius} ${radius} 0 0 1 ${point(end)}`;
+		const base = document.createElementNS(SVG, "path");
+		const stroke = document.createElementNS(SVG, "path");
+		for (const path of [base, stroke]) {
+			path.setAttribute("d", draw);
+			path.setAttribute("pathLength", "1");
+		}
+		stroke.classList.add("stage-wheel-ink");
+		stroke.setAttribute("stroke-dasharray", "0 1");
+		strokes.push(stroke);
+		wheel.append(base, stroke);
+	}
+	const addLabel = (className: string, y: string, content: string) => {
+		const label = document.createElementNS(SVG, "text");
+		label.setAttribute("x", "110");
+		label.setAttribute("y", y);
+		label.setAttribute("text-anchor", "middle");
+		label.classList.add(className);
+		label.textContent = content;
+		wheel.append(label);
+		return label;
+	};
+	const percent = addLabel("stage-wheel-percent", "115", "0%");
+	addLabel("stage-wheel-caption", "138", "ELAPSED");
+	return { wheel, strokes, percent };
+}
+
+/** The timer page: phases, countdown, session progress and controls. */
 export class Stage {
 	readonly el: HTMLElement;
 	readonly actions: StageActions;
@@ -44,10 +91,16 @@ export class Stage {
 	private readonly clock: ClockView;
 	private readonly phaseButtons = new Map<Phase, HTMLButtonElement>();
 	private readonly presetButtons = new Map<number, HTMLButtonElement>();
-	private readonly adjustRow = el("div", { class: "row adjust" });
+	private readonly adjustRow = el("div", {
+		class: "row adjust",
+		role: "group",
+		"aria-label": "session duration",
+	});
 	private readonly segments: HTMLElement[] = [];
+	private readonly wheel = printWheel();
 	private readonly stateLabel = el("span", { class: "state-label" });
-	private readonly phaseLabel = el("span", { class: "phase-label" });
+	private readonly phaseLabel = el("h1", { class: "phase-label" });
+	private readonly durationLabel = el("span", { class: "track-duration" });
 	private readonly status = el("p", { class: "status", "aria-live": "polite" });
 	private readonly toggleButton = button("start", { class: "primary" });
 	private readonly resetButton = button("reset");
@@ -74,13 +127,6 @@ export class Stage {
 			" minutes ",
 			el("kbd", {}, "←→"),
 			" phase",
-		);
-		const identity = el(
-			"div",
-			{ class: "stage-identity" },
-			el("span", { class: "stage-mark", "aria-hidden": "true" }),
-			el("span", {}, "lockin"),
-			el("span", { class: "stage-edition" }, "focus instrument"),
 		);
 
 		const stepButton = (minutes: number) => {
@@ -147,7 +193,6 @@ export class Stage {
 		this.el = el(
 			"section",
 			{ class: "stage" },
-			el("header", { class: "stage-header" }, identity, keys),
 			el(
 				"div",
 				{ class: "centre" },
@@ -155,13 +200,29 @@ export class Stage {
 				el(
 					"div",
 					{ class: "readout" },
-					el("div", { class: "readout-head" }, this.phaseLabel, this.stateLabel),
+					el("header", { class: "readout-head" }, this.phaseLabel, this.stateLabel),
 					this.clock.el,
-					track,
+					this.wheel.wheel,
+					el(
+						"div",
+						{ class: "stage-timeline", "aria-hidden": "true" },
+						track,
+						el("div", { class: "track-labels" }, el("span", {}, "0"), this.durationLabel),
+					),
 				),
 				this.status,
-				this.adjustRow,
-				controls,
+				el(
+					"div",
+					{ class: "stage-actions" },
+					el(
+						"div",
+						{ class: "stage-duration" },
+						el("p", { class: "stage-caption" }, "Minutes"),
+						this.adjustRow,
+					),
+					controls,
+				),
+				keys,
 			),
 			this.footer,
 		);
@@ -177,8 +238,9 @@ export class Stage {
 		this.clock.el.classList.toggle("paused", paused);
 		this.el.dataset.phase = phase;
 		this.el.dataset.state = idle ? "ready" : paused ? "paused" : "running";
-		setText(this.stateLabel, idle ? "standby" : paused ? "paused" : "in progress");
-		setText(this.phaseLabel, `${PHASE_LABELS[phase]} timer`);
+		setText(this.stateLabel, idle ? "ready" : paused ? "paused" : "in progress");
+		const name = PHASE_LABELS[phase];
+		setText(this.phaseLabel, `${name.charAt(0).toUpperCase()}${name.slice(1)} timer`);
 
 		for (const [name, tab] of this.phaseButtons) {
 			tab.setAttribute("aria-pressed", String(name === phase));
@@ -186,18 +248,23 @@ export class Stage {
 		}
 
 		const armedMinutes = state.durations[phase] / MINUTE;
+		setText(this.durationLabel, `${armedMinutes} min`);
 		this.adjustRow.inert = !idle;
 		for (const [minutes, preset] of this.presetButtons) {
 			preset.setAttribute("aria-pressed", String(idle && minutes === armedMinutes));
 		}
 
-		const done = progress(state, now) * STRETCHES;
+		const fraction = progress(state, now);
+		const done = fraction * STRETCHES;
 		this.segments.forEach((segment, i) => {
 			const fill = Math.min(1, Math.max(0, done - i)).toFixed(3);
-			if (segment.style.getPropertyValue("--fill") !== fill)
+			if (segment.style.getPropertyValue("--fill") !== fill) {
 				segment.style.setProperty("--fill", fill);
+				this.wheel.strokes[i]?.setAttribute("stroke-dasharray", `${fill} 1`);
+			}
 		});
-		this.segments[0]?.parentElement?.classList.toggle("off", idle || phase !== "focus");
+		const elapsed = `${Math.floor(fraction * 100)}%`;
+		if (this.wheel.percent.textContent !== elapsed) this.wheel.percent.textContent = elapsed;
 
 		setText(this.toggleButton, idle ? "start" : paused ? "resume" : "pause");
 		this.resetButton.disabled = idle;
@@ -222,20 +289,20 @@ export class Stage {
 		}, holdMs);
 	}
 
-	/** Gives the stretch that was just completed a single glow. */
+	/** Briefly extends the tick that was just reached. */
 	markCheckpoint(index: number): void {
 		const segment = this.segments[index - 1];
 		if (!segment || reducedMotion()) return;
-		segment.animate(
-			[{ filter: "brightness(1.65)", transform: "scaleY(1.65)" }, { filter: "none" }],
-			{ duration: 560, easing: "cubic-bezier(.2,.7,.2,1)" },
-		);
+		segment.animate([{ transform: "scaleY(1.65)" }, { transform: "none" }], {
+			duration: 560,
+			easing: "cubic-bezier(.2,.7,.2,1)",
+		});
 	}
 
-	/** Lets the completion land with a warm pulse instead of a hard white flash. */
+	/** A small completion cue; no flash or background changes. */
 	flash(): void {
 		if (reducedMotion()) return;
-		this.clock.el.animate([{ filter: "brightness(1.35)" }, { filter: "none" }], {
+		this.clock.el.animate([{ opacity: 0.55 }, { opacity: 1 }], {
 			duration: 650,
 			easing: "ease-out",
 		});

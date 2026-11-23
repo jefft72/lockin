@@ -10,13 +10,11 @@ test("counts down from 25 minutes", async ({ app }) => {
 	await expect(app).toHaveTitle("15:00 focus");
 });
 
-test("flips the digits that change", async ({ app }) => {
+test("keeps the visible and accessible countdown in sync", async ({ app }) => {
 	await app.keyboard.press("Space");
 	await advance(app, 1000);
-	// Only the last three digits differ between 25:00 and 24:59... and the 5 to 4.
-	await expect(app.locator(".clock .flap").first()).toBeVisible();
 	await expectClock(app, "24:59");
-	await expect(app.locator(".clock .flap")).toHaveCount(0);
+	await expect(app.locator(".clock-value")).toHaveText("24:59");
 });
 
 test("pauses and resumes without losing or gaining time", async ({ app }) => {
@@ -165,8 +163,18 @@ test("checkpoints mark each quarter of a session", async ({ app }) => {
 	await app.keyboard.press("Space");
 	await advance(app, 7 * MINUTE);
 	await expect(app.locator(".status")).toHaveText("checkpoint 1/3");
+	const fills = () =>
+		app
+			.locator(".checkpoints i")
+			.evaluateAll((segments) =>
+				segments.map((segment) =>
+					Number.parseFloat((segment as HTMLElement).style.getPropertyValue("--fill")),
+				),
+			);
+	await expect.poll(fills).toEqual([1, 0.12, 0, 0]);
 	await advance(app, 6 * MINUTE);
 	await expect(app.locator(".status")).toHaveText("checkpoint 2/3");
+	await expect.poll(fills).toEqual([1, 1, 0.08, 0]);
 });
 
 test("reset throws the session away", async ({ app }) => {

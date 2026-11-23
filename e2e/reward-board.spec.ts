@@ -17,13 +17,13 @@ test("the milestone dialog traps focus and restores it when continued", async ({
 	await expect(rewards).toBeFocused();
 });
 
-test("reduced motion reveals the milestone without spinning", async ({ app }) => {
+test("reduced motion reveals the milestone without animation", async ({ app }) => {
 	await app.emulateMedia({ reducedMotion: "reduce" });
 	await bankSession(app, 25);
 	await elapse(app, 1500);
 	const dialog = app.getByRole("dialog", { name: "reward: FIRST DEPOSIT" });
-	await expect(dialog.locator(".flap")).toHaveCount(0);
-	await expect(dialog.locator(".board-line .flip .top .glyph").first()).toHaveText("F");
+	await expect(dialog.locator(".board-line")).toHaveText("FIRST DEPOSIT");
+	expect(await dialog.evaluate((sheet) => sheet.getAnimations({ subtree: true }).length)).toBe(0);
 	await app.keyboard.press("Escape");
 	await expect(dialog).toBeHidden();
 });

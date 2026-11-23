@@ -23,7 +23,7 @@ import { startTicker } from "./platform/ticker.ts";
 import { ScreenAwake } from "./platform/wakelock.ts";
 import { BankView } from "./ui/bank.ts";
 import { Board } from "./ui/board.ts";
-import { button } from "./ui/dom.ts";
+import { button, el } from "./ui/dom.ts";
 import { NowPlayingView } from "./ui/now-playing.ts";
 import { Stage } from "./ui/stage.ts";
 import "./ui/study-view.css";
@@ -198,7 +198,52 @@ export function startApp(root: HTMLElement): void {
 		bank.say(`imported ${imported.length} ${imported.length === 1 ? "entry" : "entries"}`);
 	}
 
-	root.append(stage.el, bank.el, board.el);
+	stage.el.id = "timer";
+	stage.el.tabIndex = -1;
+	bank.el.id = "history";
+	bank.el.tabIndex = -1;
+
+	const timerLink = el("a", { href: "#timer" }, "Timer");
+	const historyLink = el("a", { href: "#history" }, "History");
+	const wordmark = el(
+		"a",
+		{ class: "wordmark", href: "#timer", "aria-label": "Lockin timer" },
+		el("span", { class: "wordmark-mark", "aria-hidden": "true" }, el("i"), el("i"), el("i")),
+		"lockin",
+	);
+
+	function visit(target: HTMLElement): void {
+		if (target === bank.el && studyView) {
+			setStudyView(false);
+			savePrefs();
+		}
+		target.focus({ preventScroll: true });
+		const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+		if (target === stage.el) window.scrollTo({ top: 0, behavior: reduced ? "instant" : "smooth" });
+		else target.scrollIntoView({ block: "start", behavior: reduced ? "instant" : "smooth" });
+	}
+	for (const [link, target] of [
+		[timerLink, stage.el],
+		[historyLink, bank.el],
+		[wordmark, stage.el],
+	] as const) {
+		link.addEventListener("click", (event) => {
+			if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
+			event.preventDefault();
+			visit(target);
+		});
+	}
+	root.append(
+		el(
+			"header",
+			{ class: "masthead" },
+			wordmark,
+			el("nav", { "aria-label": "Main" }, timerLink, historyLink),
+		),
+		el("main", { class: "workspace" }, stage.el, bank.el),
+		board.el,
+	);
+	if (location.hash === "#history") requestAnimationFrame(() => visit(bank.el));
 	showLedger(ledger);
 	bankStore.subscribe((next) => showLedger(next));
 
@@ -280,13 +325,13 @@ export function startApp(root: HTMLElement): void {
 			(target.isContentEditable || target.closest("input, textarea, select"))
 		)
 			return;
-		const onButton = target instanceof HTMLButtonElement;
+		const onControl = target instanceof HTMLElement && target.closest("button, a");
 		const step = (event.shiftKey ? 5 : 1) * MINUTE;
 		switch (event.key) {
 			case " ":
 			case "Enter":
 				// A focused button already handles its own activation keys.
-				if (onButton) return;
+				if (onControl) return;
 				stage.actions.toggle();
 				break;
 			case "ArrowUp":

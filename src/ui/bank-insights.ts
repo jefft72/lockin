@@ -87,9 +87,9 @@ export class BankInsights {
 			{ class: "bank-signal", "aria-label": "28-day focus activity" },
 			el(
 				"div",
-				{ class: "bank-signal-heading" },
-				el("h2", {}, "Focus signal"),
-				el("span", {}, "28 days"),
+				{ class: "bank-panel-heading bank-signal-heading" },
+				el("h3", {}, "Focus signal"),
+				el("span", {}, "28 DAYS"),
 			),
 			grid,
 			el("div", { class: "bank-signal-caption" }, this.detail, legend),

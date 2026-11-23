@@ -13,7 +13,11 @@ test("a small screen fits a three-digit timer and keeps its controls accessible"
 	expect((timer?.x ?? 0) + (timer?.width ?? 0)).toBeLessThanOrEqual(360);
 	expect(await app.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
 
-	await app.getByRole("button", { name: "start", exact: true }).click();
+	const start = app.getByRole("button", { name: "start", exact: true });
+	const startBox = await start.boundingBox();
+	expect(startBox).not.toBeNull();
+	expect((startBox?.y ?? 0) + (startBox?.height ?? 0)).toBeLessThanOrEqual(640);
+	await start.click();
 	await expect(app.getByRole("button", { name: "pause", exact: true })).toBeVisible();
 	await app.getByRole("button", { name: "study view" }).click();
 	await expect(app.getByRole("complementary", { name: "bank" })).toBeHidden();

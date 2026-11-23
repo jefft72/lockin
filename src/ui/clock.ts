@@ -1,58 +1,39 @@
 import { clockDigits } from "../core/format.ts";
-import { el } from "./dom.ts";
-import { FlipCell, spinPath } from "./flip.ts";
+import { el, reducedMotion, setText } from "./dom.ts";
 
-/** Delay between neighbouring digits when the whole clock spins to a new time. */
-const STAGGER_MS = 45;
+const ADJUST_MS = 240;
 
-/** The big MM:SS readout, one split-flap cell per digit. */
+/** A typographic timer whose visible text and accessible name stay in sync. */
 export class ClockView {
 	readonly el: HTMLElement;
-	private readonly minutesEl = el("span", { class: "group", "aria-hidden": "true" });
-	private readonly secondsEl = el("span", { class: "group", "aria-hidden": "true" });
-	private minutes: FlipCell[] = [];
-	private readonly seconds: FlipCell[];
+	private readonly value = el("span", { class: "clock-value", "aria-hidden": "true" });
+	private last = "";
+	private adjustment: Animation | undefined;
 
 	constructor(remainingMs: number) {
-		const digits = clockDigits(remainingMs);
-		this.seconds = [...digits.seconds].map((char) => new FlipCell(char));
-		this.secondsEl.append(...this.seconds.map((cell) => cell.el));
-		this.rebuildMinutes(digits.minutes);
-		const colon = el("span", { class: "colon", "aria-hidden": "true" }, el("i"), el("i"));
-		this.el = el(
-			"div",
-			{ class: "clock", role: "timer", "aria-live": "off" },
-			this.minutesEl,
-			colon,
-			this.secondsEl,
-		);
-		this.label(digits);
+		this.el = el("div", { class: "clock", role: "timer", "aria-live": "off" }, this.value);
+		this.render(remainingMs, false);
 	}
 
-	/**
-	 * Shows a time. A plain update flips only the digits that changed; `spin`
-	 * rolls every changed digit through the ones in between, left to right.
-	 */
 	render(remainingMs: number, spin: boolean): void {
-		const digits = clockDigits(remainingMs);
-		if (digits.minutes.length !== this.minutes.length) this.rebuildMinutes(digits.minutes);
-		const cells = [...this.minutes, ...this.seconds];
-		const chars = [...digits.minutes, ...digits.seconds];
-		cells.forEach((cell, i) => {
-			const char = chars[i] as string;
-			if (spin) cell.set(char, spinPath(cell.value, char), i * STAGGER_MS);
-			else cell.set(char);
-		});
-		this.label(digits);
-	}
+		const { minutes, seconds } = clockDigits(remainingMs);
+		const time = `${minutes}:${seconds}`;
+		if (time === this.last) return;
 
-	private rebuildMinutes(minutes: string): void {
-		this.minutes = [...minutes].map((char) => new FlipCell(char));
-		this.minutesEl.replaceChildren(...this.minutes.map((cell) => cell.el));
-	}
-
-	private label(digits: { minutes: string; seconds: string }): void {
-		this.el.setAttribute("data-wide", String(digits.minutes.length > 2));
-		this.el.setAttribute("aria-label", `${digits.minutes}:${digits.seconds} remaining`);
+		this.last = time;
+		this.adjustment?.cancel();
+		setText(this.value, time);
+		this.el.dataset.wide = String(minutes.length > 2);
+		this.el.setAttribute("aria-label", `${time} remaining`);
+		// Give deliberate user changes a small cue. Ordinary ticks are still.
+		if (spin && !reducedMotion()) {
+			this.adjustment = this.value.animate(
+				[
+					{ opacity: 0.5, transform: "translateY(.045em)" },
+					{ opacity: 1, transform: "none" },
+				],
+				{ duration: ADJUST_MS, easing: "ease-out" },
+			);
+		}
 	}
 }

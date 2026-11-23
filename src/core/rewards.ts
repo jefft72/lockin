@@ -6,7 +6,7 @@ const HOUR = 60 * MINUTE;
 
 export interface Reward {
 	readonly id: string;
-	/** Upper case, short enough for the split-flap board. */
+	/** Uppercase title for the milestone display. */
 	readonly label: string;
 	/** How to earn it. */
 	readonly hint: string;

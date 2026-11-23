@@ -5,7 +5,7 @@ import { type Day, recentDays, summarize } from "../core/stats.ts";
 import { MINUTE } from "../core/timer.ts";
 import { ACTIVITY_DAYS, BankInsights } from "./bank-insights.ts";
 import { button, el, reducedMotion } from "./dom.ts";
-import { FlipText } from "./flip-text.ts";
+import "./bank.css";
 
 export interface BankActions {
 	exportLedger(): void;
@@ -24,10 +24,10 @@ const weekdayOf = new Intl.DateTimeFormat(undefined, { weekday: "narrow" });
 
 type Tab = "sessions" | "rewards";
 
-/** The right side of the screen: everything banked so far, stacked by day. */
+/** The archive: everything banked so far, grouped by day. */
 export class BankView {
 	readonly el: HTMLElement;
-	private readonly total = new FlipText("0m");
+	private readonly total = el("p", { class: "total", "aria-label": "0m" }, "0m");
 	private readonly today = el("p");
 	private readonly streak = el("p");
 	private readonly insights = new BankInsights();
@@ -43,7 +43,9 @@ export class BankView {
 	constructor(actions: BankActions) {
 		const tabs = el("nav", { class: "row tabs", "aria-label": "bank" });
 		for (const tab of ["sessions", "rewards"] as const) {
-			const control = button(tab);
+			const control = button(tab === "sessions" ? "Sessions" : "Rewards", {
+				"aria-label": tab,
+			});
 			control.addEventListener("click", () => {
 				this.tab = tab;
 				this.renderList();
@@ -58,17 +60,48 @@ export class BankView {
 			if (file) actions.importLedger(file);
 			picker.value = "";
 		});
-		const exportButton = button("export");
+		const exportButton = button("Export JSON", { "aria-label": "export" });
 		exportButton.addEventListener("click", () => actions.exportLedger());
-		const importButton = button("import");
+		const importButton = button("Import JSON", { "aria-label": "import" });
 		importButton.addEventListener("click", () => picker.click());
 
-		this.total.el.classList.add("total");
 		this.el = el(
 			"aside",
 			{ class: "bank", "aria-label": "bank" },
-			el("header", {}, el("p", {}, "bank"), this.total.el, this.today, this.streak),
-			el("div", { class: "bank-activity" }, this.chart, this.insights.el),
+			el(
+				"header",
+				{ class: "bank-header" },
+				el(
+					"div",
+					{ class: "bank-title" },
+					el("p", { class: "bank-kicker" }, "THE RECORD"),
+					el("h2", {}, "Focus log"),
+					el("p", { class: "bank-intro" }, "Every session, in one place."),
+				),
+				el(
+					"div",
+					{ class: "bank-summary" },
+					el("p", { class: "bank-kicker" }, "TOTAL BANKED"),
+					this.total,
+					el("div", { class: "bank-metrics" }, this.today, this.streak),
+				),
+			),
+			el(
+				"div",
+				{ class: "bank-activity" },
+				el(
+					"section",
+					{ class: "bank-week", "aria-label": "Daily focus blocks" },
+					el(
+						"div",
+						{ class: "bank-panel-heading" },
+						el("h3", {}, "This week"),
+						el("span", {}, "LAST 7 DAYS"),
+					),
+					this.chart,
+				),
+				this.insights.el,
+			),
 			tabs,
 			this.list,
 			el(
@@ -86,7 +119,9 @@ export class BankView {
 		this.ledger = ledger;
 		this.now = now;
 		const summary = summarize(ledger, now);
-		this.total.set(spanText(summary.totalMs));
+		const total = spanText(summary.totalMs);
+		this.total.setAttribute("aria-label", total);
+		this.total.textContent = total;
 		this.today.replaceChildren(
 			"today ",
 			el("b", {}, spanText(summary.todayMs)),

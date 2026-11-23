@@ -1,19 +1,11 @@
-/* A local viewing preference; the timer and ledger keep running unchanged. */
-body[data-study-view] {
-	grid-template-columns: minmax(0, 1fr);
-}
-
-[data-study-view] > .bank,
+/* Study View removes the archive and playback; the same timer stays mounted. */
+[data-study-view] .workspace > .bank,
 [data-study-view] .keys,
 [data-study-view] .stage-footer .now-playing {
 	display: none;
 }
 
-[data-study-view] .centre {
-	width: min(100%, 62rem);
-	justify-self: center;
-}
-
 .stage-footer .study-view-toggle[aria-pressed="true"] {
-	color: var(--accent, var(--fg));
+	background: var(--wash);
+	color: var(--blue);
 }
