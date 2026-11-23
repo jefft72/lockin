@@ -171,41 +171,34 @@ button:focus-visible {
 	perspective: 4em;
 }
 
+/*
+ * Both halves are the full cell, each clipped to its side of the seam. Clipping
+ * happens at paint time with sub-pixel precision, so the two halves of a glyph
+ * always line up and the seam is the same width at any size or position.
+ */
 .half {
 	position: absolute;
-	left: 0;
-	width: 100%;
-	height: calc(var(--ink-h) / 2 - var(--seam) / 2);
-	overflow: hidden;
+	inset: 0;
 	/* Opaque, so a falling flap hides the glyph behind it like a real card. */
 	background: #000;
 	backface-visibility: hidden;
 }
 
 .half.top {
-	top: 0;
-	transform-origin: 50% 100%;
+	clip-path: inset(0 0 calc(50% + var(--seam) / 2) 0);
 }
 
 .half.bottom {
-	bottom: 0;
-	transform-origin: 50% 0;
+	clip-path: inset(calc(50% + var(--seam) / 2) 0 0 0);
 }
 
 .glyph {
 	position: absolute;
+	top: calc(var(--ink-top) * -1);
 	left: 0;
 	width: 100%;
 	height: 1em;
 	text-align: center;
-}
-
-.top .glyph {
-	top: calc(var(--ink-top) * -1);
-}
-
-.bottom .glyph {
-	bottom: calc(var(--ink-top) + var(--ink-h) - 1em);
 }
 
 /* checkpoints */
@@ -334,6 +327,8 @@ button:focus-visible {
 	font-stretch: 125%;
 	font-variant-numeric: tabular-nums;
 	line-height: 1;
+	/* At text size the seam is a hairline. */
+	--seam: 1px;
 }
 
 .flip-text .unit {
@@ -485,20 +480,40 @@ button:focus-visible {
 	width: 1.25em;
 }
 
-/* narrow screens: the bank moves under the clock */
+/* narrow screens: the clock takes the whole screen and the bank sits below it */
 
 @media (max-width: 880px) {
+	html,
+	body {
+		height: auto;
+	}
+
 	body {
 		grid-template-columns: minmax(0, 1fr);
-		grid-template-rows: minmax(26rem, 100svh) auto;
-		overflow: auto;
+		grid-template-rows: 100svh auto;
+		overflow: visible;
+	}
+
+	.stage {
+		padding: 1.5rem;
 	}
 
 	.keys {
 		display: none;
 	}
 
+	.stage-footer {
+		flex-wrap: wrap;
+		gap: 1rem 4ch;
+	}
+
+	.now-playing {
+		flex-basis: 100%;
+	}
+
 	.bank {
+		display: flex;
+		flex-direction: column;
 		border-top: 1px solid var(--line);
 		border-left: 0;
 	}
