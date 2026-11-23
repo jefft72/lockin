@@ -38,6 +38,14 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: End-to-end tests
         run: npm run test:e2e
+      - name: Install globally and run study from another directory
+        run: |
+          npm run install:global
+          cd "$RUNNER_TEMP"
+          study --no-open
+          curl --fail --silent --show-error http://127.0.0.1:2525/ | grep -q '<title>lockin</title>'
+          study status
+          study stop
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
         with:
