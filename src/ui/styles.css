@@ -245,10 +245,81 @@ button:focus-visible {
 
 .stage-footer {
 	display: flex;
-	align-items: baseline;
-	justify-content: space-between;
-	gap: 2ch;
+	align-items: flex-start;
+	justify-content: flex-end;
+	gap: 4ch;
 	min-height: 1.6em;
+}
+
+.stage-footer > button {
+	flex: none;
+}
+
+/* now playing */
+
+.now-playing {
+	flex: 1;
+	min-width: 0;
+	max-width: 34rem;
+	margin-right: auto;
+}
+
+.now-playing[hidden] {
+	display: none;
+}
+
+/* A paused track greys out, title and progress line together. */
+.now-playing {
+	--song: var(--fg);
+}
+
+.now-playing[data-state="paused"] {
+	--song: var(--dim);
+}
+
+.song-row {
+	display: flex;
+	gap: 3ch;
+}
+
+.song {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.song b {
+	color: var(--song);
+	font-weight: inherit;
+}
+
+.song-row .row {
+	flex: none;
+	flex-wrap: nowrap;
+}
+
+.song-row [hidden] {
+	display: none;
+}
+
+.song-progress {
+	height: 2px;
+	margin-top: 6px;
+	background: var(--line);
+}
+
+.now-playing:not([data-state="playing"], [data-state="paused"]) .song-progress {
+	visibility: hidden;
+}
+
+.song-progress i {
+	display: block;
+	height: 100%;
+	background: var(--song);
+	transform: scaleX(var(--fill, 0));
+	transform-origin: 0 50%;
 }
 
 /* digits used at text size: bank total */

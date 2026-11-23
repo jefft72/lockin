@@ -17,12 +17,14 @@ import {
 } from "./core/timer.ts";
 import { Chime } from "./platform/chime.ts";
 import { ledgerStore } from "./platform/ledger-store.ts";
+import { watchNowPlaying } from "./platform/now-playing-client.ts";
 import { jsonStore } from "./platform/storage.ts";
 import { startTicker } from "./platform/ticker.ts";
 import { ScreenAwake } from "./platform/wakelock.ts";
 import { BankView } from "./ui/bank.ts";
 import { Board } from "./ui/board.ts";
 import { button } from "./ui/dom.ts";
+import { NowPlayingView } from "./ui/now-playing.ts";
 import { Stage } from "./ui/stage.ts";
 
 /** How long typed digits keep accumulating into one number of minutes. */
@@ -88,7 +90,10 @@ export function startApp(root: HTMLElement): void {
 		prefsStore.save({ sound: chime.enabled });
 		chime.unlock();
 	});
-	stage.footer.append(soundButton);
+
+	const nowPlaying = new NowPlayingView((command) => music.send(command));
+	const music = watchNowPlaying((sample, at) => nowPlaying.update(sample, at));
+	stage.footer.append(nowPlaying.el, soundButton);
 
 	const bankStore = ledgerStore();
 	let ledger: Ledger = bankStore.read();
@@ -156,6 +161,7 @@ export function startApp(root: HTMLElement): void {
 		const label = state.phase === "focus" ? "focus" : "break";
 		document.title = state.run ? `${clockText(remainingMs(state, now))} ${label}` : "lockin";
 		awake.set(state.run?.clock.kind === "running");
+		nowPlaying.tick(now);
 		// The bank is drawn relative to today, so it turns over at midnight.
 		if (dayKey(now) !== today) {
 			today = dayKey(now);
