@@ -186,13 +186,17 @@ test.describe("the ledger", () => {
 
 		// The file holds one session, the bank two: importing would lose one.
 		const picker = app.locator('.bank input[type="file"]');
-		app.once("dialog", (dialog) => dialog.dismiss());
-		await picker.setInputFiles(file);
+		await Promise.all([
+			app.waitForEvent("dialog").then((dialog) => dialog.dismiss()),
+			picker.setInputFiles(file),
+		]);
 		await expect(app.locator(".audit")).toHaveText("ledger verified · 2 entries");
 		expect(await ledgerOf(app)).toHaveLength(2);
 
-		app.once("dialog", (dialog) => dialog.accept());
-		await picker.setInputFiles(file);
+		await Promise.all([
+			app.waitForEvent("dialog").then((dialog) => dialog.accept()),
+			picker.setInputFiles(file),
+		]);
 		await expect(app.locator(".audit")).toHaveText("ledger verified · 1 entry");
 	});
 });
