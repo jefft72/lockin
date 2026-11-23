@@ -10,7 +10,7 @@ import {
 	type TimerState,
 } from "../core/timer.ts";
 import { ClockView } from "./clock.ts";
-import { button, el, reducedMotion } from "./dom.ts";
+import { button, el, reducedMotion, setText } from "./dom.ts";
 
 export interface StageActions {
 	toggle(): void;
@@ -26,6 +26,11 @@ const PHASE_LABELS: Record<Phase, string> = {
 	break: "break",
 	longBreak: "long break",
 };
+
+/** Scroll distance over the clock that changes the duration by one minute. */
+const WHEEL_STEP_PX = 100;
+/** A pause this long between wheel events starts a fresh gesture. */
+const WHEEL_IDLE_MS = 250;
 
 const PRESETS = [15, 25, 45, 60, 90];
 const STEPS = [-5, -1, 1, 5];
@@ -103,11 +108,24 @@ export class Stage {
 			this.bankButton,
 		);
 
+		// A mouse wheel arrives in notches, a trackpad as a stream of pixels. Both
+		// are summed and turned into one-minute steps, so a swipe does not send
+		// the duration flying.
+		let scrolled = 0;
+		let scrolledAt = 0;
 		this.clock.el.addEventListener(
 			"wheel",
 			(event) => {
 				event.preventDefault();
-				if (event.deltaY !== 0) actions.adjust(event.deltaY < 0 ? MINUTE : -MINUTE);
+				if (event.timeStamp - scrolledAt > WHEEL_IDLE_MS) scrolled = 0;
+				scrolledAt = event.timeStamp;
+				scrolled +=
+					event.deltaMode === WheelEvent.DOM_DELTA_PIXEL ? event.deltaY : event.deltaY * 40;
+				const steps = Math.trunc(scrolled / WHEEL_STEP_PX);
+				if (steps === 0) return;
+				scrolled -= steps * WHEEL_STEP_PX;
+				// Scrolling up adds time.
+				actions.adjust(-steps * MINUTE);
 			},
 			{ passive: false },
 		);
@@ -157,17 +175,17 @@ export class Stage {
 		});
 		this.segments[0]?.parentElement?.classList.toggle("off", idle || phase !== "focus");
 
-		this.toggleButton.textContent = idle ? "start" : paused ? "resume" : "pause";
+		setText(this.toggleButton, idle ? "start" : paused ? "resume" : "pause");
 		this.resetButton.disabled = idle;
 		const bankable = canBank(state, now);
 		this.bankButton.disabled = !bankable;
 		const banked = run ? run.totalMs - remainingMs(state, now) : 0;
-		this.bankButton.textContent = bankable ? `bank ${spanText(banked)}` : "bank";
+		setText(this.bankButton, bankable ? `bank ${spanText(banked)}` : "bank");
 		this.bankButton.title = bankable
 			? "end the session now and bank the time so far"
 			: "bank a session early once a minute of focus is in";
 
-		if (!this.statusTimer) this.status.textContent = paused ? "paused" : "";
+		if (!this.statusTimer) setText(this.status, paused ? "paused" : "");
 	}
 
 	/** Shows a short message under the clock, then lets the resting text return. */

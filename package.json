@@ -8,7 +8,7 @@
 	},
 	"scripts": {
 		"dev": "vite",
-		"start": "vite build && vite preview",
+		"start": "vite build && vite preview --open",
 		"build": "vite build",
 		"typecheck": "tsc --noEmit",
 		"lint": "biome check . && tsc --noEmit",

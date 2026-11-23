@@ -59,13 +59,17 @@ export function startApp(root: HTMLElement): void {
 	const prefsStore = jsonStore("lockin.prefs.v1", parsePrefs);
 	const chime = new Chime();
 	chime.enabled = prefsStore.load()?.sound ?? true;
+	// Sound is only allowed after a gesture, so take the first one on offer.
+	// A run restored by a reload can then still chime when it ends.
+	for (const gesture of ["pointerdown", "keydown"] as const) {
+		addEventListener(gesture, () => chime.unlock(), { once: true, capture: true });
+	}
 	const awake = new ScreenAwake();
 	const board = new Board();
 
 	const stage = new Stage(state, Date.now(), {
 		toggle: () => {
 			const now = Date.now();
-			chime.unlock();
 			if (state.run?.clock.kind === "running") dispatch({ type: "pause", now });
 			else dispatch({ type: "start", now, id: crypto.randomUUID() });
 		},
@@ -88,7 +92,6 @@ export function startApp(root: HTMLElement): void {
 	soundButton.addEventListener("click", () => {
 		setSound(!chime.enabled);
 		prefsStore.save({ sound: chime.enabled });
-		chime.unlock();
 	});
 
 	const nowPlaying = new NowPlayingView((command) => music.send(command));

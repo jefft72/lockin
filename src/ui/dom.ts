@@ -19,3 +19,11 @@ export function button(label: string, attrs: Record<string, string> = {}): HTMLB
 export function reducedMotion(): boolean {
 	return matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
+
+/**
+ * Sets text only when it differs. Rewriting identical text replaces the node,
+ * which makes screen readers repeat live regions and drops any hover tooltip.
+ */
+export function setText(node: HTMLElement, text: string): void {
+	if (node.textContent !== text) node.textContent = text;
+}

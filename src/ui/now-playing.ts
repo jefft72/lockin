@@ -1,5 +1,5 @@
 import type { Command, NowPlaying } from "../core/now-playing.ts";
-import { button, el } from "./dom.ts";
+import { button, el, setText } from "./dom.ts";
 
 /** The strip at the foot of the stage showing what Spotify is playing. */
 export class NowPlayingView {
@@ -32,11 +32,15 @@ export class NowPlayingView {
 		this.controls.hidden = !hasTrack;
 		if (hasTrack) {
 			const { name, artist } = nowPlaying.track;
-			this.text.replaceChildren("spotify ", el("b", {}, name), ` ${artist}`);
-			this.text.title = `${name} - ${artist}`;
-			this.toggle.textContent = nowPlaying.state === "playing" ? "pause" : "play";
+			const title = `${name} - ${artist}`;
+			// Most polls find the same song: leave the DOM alone when they do.
+			if (this.text.title !== title) {
+				this.text.replaceChildren("spotify ", el("b", {}, name), ` ${artist}`);
+				this.text.title = title;
+			}
+			setText(this.toggle, nowPlaying.state === "playing" ? "pause" : "play");
 		} else {
-			this.text.textContent = nowPlaying.state === "closed" ? "spotify closed" : "spotify idle";
+			setText(this.text, nowPlaying.state === "closed" ? "spotify closed" : "spotify idle");
 			this.text.removeAttribute("title");
 		}
 		this.tick(sampledAt);
