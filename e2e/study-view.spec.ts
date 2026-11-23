@@ -26,3 +26,20 @@ test("study view hides the bank, survives reload, and leaves the timer running",
 	await toggle.click();
 	await expect(bank).toBeVisible();
 });
+
+test("history navigation reveals the archive from Study View without stopping the clock", async ({
+	app,
+}) => {
+	await app.keyboard.press("Space");
+	await app.getByRole("button", { name: "study view" }).click();
+	await app.getByRole("link", { name: "History", exact: true }).click();
+	await expect(app.getByRole("complementary", { name: "bank" })).toBeFocused();
+	await expect(app.getByRole("button", { name: "study view" })).toHaveAttribute(
+		"aria-pressed",
+		"false",
+	);
+	await advance(app, 1000);
+	await expectClock(app, "24:59");
+	await app.getByRole("link", { name: "Timer", exact: true }).click();
+	await expect(app.getByRole("button", { name: "pause", exact: true })).toBeVisible();
+});

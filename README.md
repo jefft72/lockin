@@ -1,6 +1,6 @@
 # Lockin
 
-A local-first study timer with a split-flap clock and a focus bank. Pick a time, work until the bell, and bank the time you actually put in.
+A local-first study timer with a focus bank. Pick a time, work until the bell, and bank the time you actually put in.
 
 ## Run it
 
@@ -18,8 +18,8 @@ That builds the app and opens it at `http://127.0.0.1:2525`. To install the comm
 - **Space** starts, pauses or resumes. **← / →** picks a phase.
 - **↑ / ↓** adjusts minutes. Hold **Shift** for five minutes, or type a duration directly.
 - **B** banks an unfinished focus session after at least one minute. **R** resets without banking.
-- **V** toggles Study View, which hides the bank and music strip without interrupting the timer. **Esc** returns to the dashboard. **M** toggles sound.
-- The bank shows daily activity over the last 28 local calendar days. Hover, tap, or navigate its tiles with the keyboard for exact session totals. Milestones appear on the split-flap board.
+- **V** toggles Study View, which hides the bank and music strip without interrupting the timer. **Esc** brings the archive back. **M** toggles sound.
+- Open **History** for the focus bank, session ledger, and rewards. The heatmap shows 28 local calendar days; hover, tap, or navigate the tiles with the keyboard for exact session totals. Milestones appear when they are earned.
 
 Timer state and the bank live in this browser. A different port, browser or browser profile has its own storage. Use the bank’s JSON export to back up or move your history.
 
