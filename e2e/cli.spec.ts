@@ -1,5 +1,6 @@
 import { execFile, spawn } from "node:child_process";
 import { once } from "node:events";
+import { readFile, writeFile } from "node:fs/promises";
 import { createServer, get } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -21,7 +22,7 @@ function study(port: number, ...args: string[]): Promise<Result> {
 		execFile(
 			process.execPath,
 			[CLI, ...args, "--port", String(port)],
-			{ cwd: tmpdir() },
+			{ cwd: tmpdir(), env: { ...process.env, ...browser } },
 			(error, stdout, stderr) => {
 				resolve({ code: error ? Number(error.code) : 0, stdout, stderr });
 			},
@@ -59,13 +60,38 @@ const identityOf = async (port: number) =>
 	JSON.parse(await read(`http://127.0.0.1:${port}/api/lockin`));
 
 let port: number;
+/** Environment that swaps the real browser for one that only records what it was asked to open. */
+let browser: { BROWSER: string };
+let opened: string;
 
 test.beforeEach(async () => {
 	port = await freePort();
+	opened = test.info().outputPath("opened");
+	const fake = test.info().outputPath("browser.sh");
+	await writeFile(fake, `#!/bin/sh\necho "$1" >> "${opened}"\n`, { mode: 0o755 });
+	browser = { BROWSER: fake };
 });
 
 test.afterEach(async () => {
 	await study(port, "stop");
+});
+
+test("opens the browser every time, whether or not the server was already running", async () => {
+	const url = `http://127.0.0.1:${port}`;
+	expect(await study(port)).toEqual({ code: 0, stdout: `started · ${url}\n`, stderr: "" });
+	expect(await study(port)).toEqual({ code: 0, stdout: `running · ${url}\n`, stderr: "" });
+	await expect.poll(() => readFile(opened, "utf8").catch(() => "")).toBe(`${url}\n${url}\n`);
+});
+
+test("says so when no browser could be opened, and still starts", async () => {
+	browser = { BROWSER: "/nonexistent/browser" };
+	const url = `http://127.0.0.1:${port}`;
+	expect(await study(port)).toEqual({
+		code: 0,
+		stdout: `started · ${url}\ncould not open a browser: open that address yourself\n`,
+		stderr: "",
+	});
+	expect(await read(url)).toContain("<title>lockin</title>");
 });
 
 test("starts in the background from any directory, only once, and stops", async () => {
