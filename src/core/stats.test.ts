@@ -126,6 +126,11 @@ describe("rewards", () => {
 		]);
 	});
 
+	it("rewards the longest session there can be", () => {
+		expect(earned([entry(at(22, 12), 179)]).has("session-180m")).toBe(false);
+		expect(earned([entry(at(22, 12), 180)]).has("session-180m")).toBe(true);
+	});
+
 	it("never takes a reward back when a streak ends", () => {
 		const ledger = [entry(at(1)), entry(at(2)), entry(at(3))];
 		const later = [...ledger, entry(at(20))];

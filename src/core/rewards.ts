@@ -1,6 +1,6 @@
 import type { Ledger } from "./ledger.ts";
 import { type Summary, summarize } from "./stats.ts";
-import { MINUTE } from "./timer.ts";
+import { MAX_DURATION, MINUTE } from "./timer.ts";
 
 const HOUR = 60 * MINUTE;
 
@@ -71,6 +71,8 @@ export const REWARDS: readonly Reward[] = [
 	...[2, 4, 6, 8].map(bigDay),
 	longSession(50, "DEEP WORK"),
 	longSession(90, "MARATHON"),
+	// The longest a single session can be, by countdown or by stopwatch.
+	longSession(MAX_DURATION / MINUTE, "THE LONG HAUL"),
 ];
 
 export function earned(ledger: Ledger): Set<string> {

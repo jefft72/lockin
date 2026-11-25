@@ -84,11 +84,11 @@ test.describe("rewards", () => {
 
 	test("the rewards tab tracks what is earned and how far the rest is", async ({ app }) => {
 		await app.getByRole("button", { name: "rewards" }).click();
-		await expect(app.locator(".list")).toContainText("0 of 26 earned");
+		await expect(app.locator(".list")).toContainText("0 of 27 earned");
 		await bankSession(app, 60);
 		await clearBoard(app);
 		const list = app.locator(".list");
-		await expect(list).toContainText("3 of 26 earned");
+		await expect(list).toContainText("3 of 27 earned");
 		await expect(list.locator(".earned")).toHaveText([
 			"first deposit",
 			"1 hour banked",
