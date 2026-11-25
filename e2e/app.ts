@@ -26,8 +26,13 @@ export const test = base.extend<{ app: Page }>({
 
 export { expect };
 
-export async function expectClock(page: Page, reading: string): Promise<void> {
-	await expect(page.getByRole("timer")).toHaveAttribute("aria-label", `${reading} remaining`);
+/** The clock reads a time left by default, or a time gone for the stopwatch. */
+export async function expectClock(
+	page: Page,
+	reading: string,
+	counting: "remaining" | "elapsed" = "remaining",
+): Promise<void> {
+	await expect(page.getByRole("timer")).toHaveAttribute("aria-label", `${reading} ${counting}`);
 }
 
 /**
