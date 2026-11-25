@@ -1,21 +1,15 @@
-import { MINUTE, SECOND } from "./timer.ts";
+import { MINUTE } from "./timer.ts";
 
-/**
- * Splits a remaining time into the characters the clock shows. Rounds up, so
- * the display reads the full duration at the start and hits zero exactly when
- * the run ends, never a second early.
- */
-export function clockDigits(remainingMs: number): { minutes: string; seconds: string } {
-	const totalSeconds = Math.ceil(Math.max(0, remainingMs) / SECOND);
-	const minutes = Math.floor(totalSeconds / 60);
+/** Splits a whole number of seconds into the characters the clock shows. */
+export function clockDigits(totalSeconds: number): { minutes: string; seconds: string } {
 	return {
-		minutes: String(minutes).padStart(2, "0"),
+		minutes: String(Math.floor(totalSeconds / 60)).padStart(2, "0"),
 		seconds: String(totalSeconds % 60).padStart(2, "0"),
 	};
 }
 
-export function clockText(remainingMs: number): string {
-	const { minutes, seconds } = clockDigits(remainingMs);
+export function clockText(totalSeconds: number): string {
+	const { minutes, seconds } = clockDigits(totalSeconds);
 	return `${minutes}:${seconds}`;
 }
 

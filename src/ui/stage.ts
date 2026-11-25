@@ -1,12 +1,14 @@
 import { spanText } from "../core/format.ts";
 import {
 	canBank,
+	elapsedMs,
+	isWork,
 	MINUTE,
 	PHASES,
 	type Phase,
-	progress,
-	remainingMs,
+	reading,
 	STRETCHES,
+	stretchesDone,
 	type TimerState,
 } from "../core/timer.ts";
 import { ClockView } from "./clock.ts";
@@ -25,6 +27,7 @@ const PHASE_LABELS: Record<Phase, string> = {
 	focus: "focus",
 	break: "break",
 	longBreak: "long break",
+	stopwatch: "stopwatch",
 };
 
 /** Scroll distance over the clock that changes the duration by one minute. */
@@ -54,7 +57,7 @@ export class Stage {
 
 	constructor(state: TimerState, now: number, actions: StageActions) {
 		this.actions = actions;
-		this.clock = new ClockView(remainingMs(state, now));
+		this.clock = new ClockView(reading(state, now));
 
 		const phases = el("nav", { class: "row phases", "aria-label": "phase" });
 		for (const phase of PHASES) {
@@ -66,7 +69,7 @@ export class Stage {
 		const keys = el(
 			"p",
 			{ class: "keys" },
-			"space start/pause · ↑↓ minutes · 0-9 type minutes · ←→ phase · r reset · b bank · m mute",
+			"space start/pause · ↑↓ or 0-9 minutes · ←→ mode · r reset · b bank · m mute",
 		);
 
 		const stepButton = (minutes: number) => {
@@ -153,7 +156,7 @@ export class Stage {
 		const idle = run === null;
 		const paused = run?.clock.kind === "paused";
 
-		this.clock.render(remainingMs(state, now), spin);
+		this.clock.render(reading(state, now), spin);
 		this.clock.el.classList.toggle("paused", paused);
 
 		for (const [name, tab] of this.phaseButtons) {
@@ -161,29 +164,29 @@ export class Stage {
 			tab.disabled = !idle && name !== phase;
 		}
 
-		const armedMinutes = state.durations[phase] / MINUTE;
-		this.adjustRow.inert = !idle;
+		// The stopwatch has no length to set, so it has nothing to adjust.
+		const armedMinutes = phase === "stopwatch" ? null : state.durations[phase] / MINUTE;
+		this.adjustRow.inert = !idle || armedMinutes === null;
 		for (const [minutes, preset] of this.presetButtons) {
 			preset.setAttribute("aria-pressed", String(idle && minutes === armedMinutes));
 		}
 
-		const done = progress(state, now) * STRETCHES;
+		const done = stretchesDone(state, now);
 		this.segments.forEach((segment, i) => {
 			const fill = Math.min(1, Math.max(0, done - i)).toFixed(3);
 			if (segment.style.getPropertyValue("--fill") !== fill)
 				segment.style.setProperty("--fill", fill);
 		});
-		this.segments[0]?.parentElement?.classList.toggle("off", idle || phase !== "focus");
+		this.segments[0]?.parentElement?.classList.toggle("off", idle || !isWork(phase));
 
 		setText(this.toggleButton, idle ? "start" : paused ? "resume" : "pause");
 		this.resetButton.disabled = idle;
 		const bankable = canBank(state, now);
 		this.bankButton.disabled = !bankable;
-		const banked = run ? run.totalMs - remainingMs(state, now) : 0;
-		setText(this.bankButton, bankable ? `bank ${spanText(banked)}` : "bank");
+		setText(this.bankButton, bankable ? `bank ${spanText(elapsedMs(state, now))}` : "bank");
 		this.bankButton.title = bankable
 			? "end the session now and bank the time so far"
-			: "bank a session early once a minute of focus is in";
+			: "a session can be banked once a minute of focus is in";
 
 		if (!this.statusTimer) setText(this.status, paused ? "paused" : "");
 	}

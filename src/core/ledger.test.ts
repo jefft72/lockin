@@ -82,6 +82,13 @@ describe("parseLedger", () => {
 		expect(parseLedger(JSON.parse(JSON.stringify(ledger)))).toEqual(ledger);
 	});
 
+	it("accepts stopwatch sessions alongside countdowns", async () => {
+		const timed = session(2, { plannedMs: 0, kind: "stopwatch" });
+		const ledger = await deposit(await ledgerOf(1), timed);
+		expect(parseLedger(JSON.parse(JSON.stringify(ledger)))).toEqual(ledger);
+		expect(await audit(ledger)).toEqual({ ok: true });
+	});
+
 	it("keeps a tampered but well-formed ledger so it can be reported", async () => {
 		const ledger = await ledgerOf(2);
 		const padded = ledger.map((entry) => ({ ...entry, focusMs: 60 * MINUTE }));

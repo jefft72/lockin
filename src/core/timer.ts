@@ -3,17 +3,30 @@
  * ticks: every event carries the wall time it happened at, and a running timer
  * is just a deadline. That makes it immune to throttled tabs, sleeping laptops
  * and reloads, and lets tests drive it with plain numbers.
+ *
+ * The stopwatch is the same machine read the other way round: a countdown
+ * from a cap, shown as the time gone rather than the time left.
  */
 
-export const PHASES = ["focus", "break", "longBreak"] as const;
+export const PHASES = ["focus", "break", "longBreak", "stopwatch"] as const;
 export type Phase = (typeof PHASES)[number];
+/** The phases that count down from a length the user sets. The stopwatch counts up instead. */
+export type TimedPhase = Exclude<Phase, "stopwatch">;
 
 export const SECOND = 1_000;
 export const MINUTE = 60 * SECOND;
 export const MIN_DURATION = MINUTE;
 export const MAX_DURATION = 180 * MINUTE;
-/** A focus run is split into this many equal stretches, with a checkpoint between each. */
+/** A run of work is split into this many stretches, with a checkpoint between each. */
 export const STRETCHES = 4;
+/**
+ * A stopwatch run is open-ended but not endless: it banks itself at this
+ * length. The bank is append-only, so a stopwatch forgotten overnight must not
+ * be able to deposit a day of hours nobody worked.
+ */
+export const STOPWATCH_CAP = MAX_DURATION;
+/** The elapsed times a stopwatch run announces as its checkpoints. */
+export const STOPWATCH_MARKS = [25 * MINUTE, 50 * MINUTE, 90 * MINUTE] as const;
 /** Every Nth completed focus run earns the long break. */
 export const LONG_BREAK_EVERY = 4;
 /** Banking early is only allowed once this much focus time has been put in. */
@@ -26,6 +39,7 @@ export type RunClock =
 export interface Run {
 	readonly id: string;
 	readonly startedAt: number;
+	/** The length counted down from. For a stopwatch, the cap it stops at. */
 	readonly totalMs: number;
 	/** Checkpoints already announced, 0 to STRETCHES - 1. */
 	readonly checkpoint: number;
@@ -34,8 +48,8 @@ export interface Run {
 
 export interface TimerState {
 	readonly phase: Phase;
-	readonly durations: Readonly<Record<Phase, number>>;
-	/** Null while idle: the timer is armed at `durations[phase]`. */
+	readonly durations: Readonly<Record<TimedPhase, number>>;
+	/** Null while idle: the timer is armed and waiting. */
 	readonly run: Run | null;
 	/** Focus runs completed so far, used to schedule the long break. */
 	readonly cycle: number;
@@ -45,10 +59,12 @@ export interface SessionRecord {
 	readonly id: string;
 	readonly startedAt: number;
 	readonly endedAt: number;
-	/** Time actually spent counting down, pauses excluded. */
+	/** Time actually spent with the clock running, pauses excluded. */
 	readonly focusMs: number;
+	/** The length the session was set to. 0 for a stopwatch session, which has none. */
 	readonly plannedMs: number;
-	readonly kind: "full" | "partial";
+	/** `full` and `partial` are countdowns that ran out or were banked early. */
+	readonly kind: "full" | "partial" | "stopwatch";
 }
 
 export type TimerEvent =
@@ -61,7 +77,8 @@ export type TimerEvent =
 	| { readonly type: "selectPhase"; readonly phase: Phase };
 
 export type TimerEffect =
-	| { readonly type: "checkpoint"; readonly index: number }
+	/** `atMs` is how far into the run the checkpoint sits. */
+	| { readonly type: "checkpoint"; readonly index: number; readonly atMs: number }
 	| { readonly type: "finished"; readonly phase: Phase; readonly session: SessionRecord | null };
 
 export type Transition = readonly [TimerState, readonly TimerEffect[]];
@@ -80,25 +97,76 @@ export function clampDuration(ms: number): number {
 	return Math.min(MAX_DURATION, Math.max(MIN_DURATION, whole));
 }
 
+/** Work is what gets banked and has checkpoints. Breaks do neither. */
+export function isWork(phase: Phase): boolean {
+	return phase === "focus" || phase === "stopwatch";
+}
+
+/** How long a run started now could last. */
+function armedMs(state: TimerState): number {
+	return state.phase === "stopwatch" ? STOPWATCH_CAP : state.durations[state.phase];
+}
+
 export function remainingMs(state: TimerState, now: number): number {
 	const { run } = state;
-	if (!run) return state.durations[state.phase];
+	if (!run) return armedMs(state);
 	return run.clock.kind === "running"
 		? Math.max(0, run.clock.deadline - now)
 		: run.clock.remainingMs;
 }
 
-/** Fraction of the current run that has elapsed, 0 while idle. */
-export function progress(state: TimerState, now: number): number {
+/** Time the current run has spent with its clock running, 0 while idle. */
+export function elapsedMs(state: TimerState, now: number): number {
+	const { run } = state;
+	return run ? run.totalMs - remainingMs(state, now) : 0;
+}
+
+export interface Reading {
+	readonly seconds: number;
+	readonly counting: "up" | "down";
+}
+
+/**
+ * What the clock should show, in whole seconds. Either way a second only
+ * counts once it is fully spent: a countdown reads its full length at the
+ * start and zero exactly when it ends, and a stopwatch starts at zero.
+ */
+export function reading(state: TimerState, now: number): Reading {
+	return state.phase === "stopwatch"
+		? { seconds: Math.floor(elapsedMs(state, now) / SECOND), counting: "up" }
+		: { seconds: Math.ceil(remainingMs(state, now) / SECOND), counting: "down" };
+}
+
+/**
+ * Where each stretch of a run ends, as elapsed time. A countdown is cut into
+ * equal parts. A stopwatch has no length to divide, so its stretches end at
+ * fixed marks instead. Breaks have none.
+ */
+function stretchEnds(phase: Phase, totalMs: number): readonly number[] {
+	if (phase === "stopwatch") return [...STOPWATCH_MARKS, totalMs];
+	if (phase !== "focus") return [];
+	return Array.from({ length: STRETCHES }, (_, i) => (totalMs * (i + 1)) / STRETCHES);
+}
+
+/**
+ * How many stretches of the current run are done, fractions included: 2.5 is
+ * halfway through the third. 0 while idle and during breaks.
+ */
+export function stretchesDone(state: TimerState, now: number): number {
 	const { run } = state;
 	if (!run) return 0;
-	return Math.min(1, Math.max(0, 1 - remainingMs(state, now) / run.totalMs));
+	const ends = stretchEnds(state.phase, run.totalMs);
+	const elapsed = elapsedMs(state, now);
+	let start = 0;
+	for (const [index, end] of ends.entries()) {
+		if (elapsed < end) return index + (elapsed - start) / (end - start);
+		start = end;
+	}
+	return ends.length;
 }
 
 export function canBank(state: TimerState, now: number): boolean {
-	const { run } = state;
-	if (!run || state.phase !== "focus") return false;
-	return run.totalMs - remainingMs(state, now) >= MIN_BANKABLE;
+	return isWork(state.phase) && elapsedMs(state, now) >= MIN_BANKABLE;
 }
 
 function finish(
@@ -106,16 +174,25 @@ function finish(
 	run: Run,
 	endedAt: number,
 	focusMs: number,
-	kind: SessionRecord["kind"],
+	early: boolean,
 ): Transition {
 	const { phase } = state;
-	const wasFocus = phase === "focus";
-	const cycle = wasFocus ? state.cycle + 1 : state.cycle;
-	const next: Phase = !wasFocus ? "focus" : cycle % LONG_BREAK_EVERY === 0 ? "longBreak" : "break";
-	const session: SessionRecord | null = wasFocus
-		? { id: run.id, startedAt: run.startedAt, endedAt, focusMs, plannedMs: run.totalMs, kind }
-		: null;
-	return [{ ...state, phase: next, run: null, cycle }, [{ type: "finished", phase, session }]];
+	const idle = { ...state, run: null };
+	const span = { id: run.id, startedAt: run.startedAt, endedAt, focusMs };
+	if (phase === "stopwatch") {
+		// No plan to fall short of, and no break owed: the stopwatch stays put
+		// and the pomodoro cycle does not move.
+		const session: SessionRecord = { ...span, plannedMs: 0, kind: "stopwatch" };
+		return [idle, [{ type: "finished", phase, session }]];
+	}
+	if (phase !== "focus") {
+		return [{ ...idle, phase: "focus" }, [{ type: "finished", phase, session: null }]];
+	}
+	const cycle = state.cycle + 1;
+	const next: Phase = cycle % LONG_BREAK_EVERY === 0 ? "longBreak" : "break";
+	const kind = early ? "partial" : "full";
+	const session: SessionRecord = { ...span, plannedMs: run.totalMs, kind };
+	return [{ ...idle, phase: next, cycle }, [{ type: "finished", phase, session }]];
 }
 
 export function reduce(state: TimerState, event: TimerEvent): Transition {
@@ -123,7 +200,7 @@ export function reduce(state: TimerState, event: TimerEvent): Transition {
 	switch (event.type) {
 		case "start": {
 			if (!run) {
-				const totalMs = state.durations[state.phase];
+				const totalMs = armedMs(state);
 				const clock: RunClock = { kind: "running", deadline: event.now + totalMs };
 				const started: Run = { id: event.id, startedAt: event.now, totalMs, checkpoint: 0, clock };
 				return [{ ...state, run: started }, NO_EFFECTS];
@@ -141,29 +218,34 @@ export function reduce(state: TimerState, event: TimerEvent): Transition {
 			if (run?.clock.kind !== "running") return [state, NO_EFFECTS];
 			if (event.now >= run.clock.deadline) {
 				// The run ended at its deadline, however late this tick arrives.
-				return finish(state, run, run.clock.deadline, run.totalMs, "full");
+				return finish(state, run, run.clock.deadline, run.totalMs, false);
 			}
-			if (state.phase !== "focus") return [state, NO_EFFECTS];
-			const reached = Math.min(STRETCHES - 1, Math.floor(progress(state, event.now) * STRETCHES));
-			if (reached <= run.checkpoint) return [state, NO_EFFECTS];
+			const elapsed = elapsedMs(state, event.now);
+			const passed = stretchEnds(state.phase, run.totalMs)
+				.slice(0, STRETCHES - 1)
+				.filter((end) => end <= elapsed);
+			const atMs = passed.at(-1);
+			if (atMs === undefined || passed.length <= run.checkpoint) return [state, NO_EFFECTS];
 			// A late tick can cross several checkpoints at once: announce only the latest.
 			return [
-				{ ...state, run: { ...run, checkpoint: reached } },
-				[{ type: "checkpoint", index: reached }],
+				{ ...state, run: { ...run, checkpoint: passed.length } },
+				[{ type: "checkpoint", index: passed.length, atMs }],
 			];
 		}
 		case "bank": {
 			if (!run || !canBank(state, event.now)) return [state, NO_EFFECTS];
 			const left = remainingMs(state, event.now);
-			if (left === 0) return finish(state, run, event.now, run.totalMs, "full");
-			return finish(state, run, event.now, run.totalMs - left, "partial");
+			return finish(state, run, event.now, run.totalMs - left, left > 0);
 		}
 		case "reset":
 			return run ? [{ ...state, run: null }, NO_EFFECTS] : [state, NO_EFFECTS];
 		case "setDuration": {
+			const { phase } = state;
+			// The stopwatch has no length to set.
+			if (run || phase === "stopwatch") return [state, NO_EFFECTS];
 			const ms = clampDuration(event.ms);
-			if (run || ms === state.durations[state.phase]) return [state, NO_EFFECTS];
-			return [{ ...state, durations: { ...state.durations, [state.phase]: ms } }, NO_EFFECTS];
+			if (ms === state.durations[phase]) return [state, NO_EFFECTS];
+			return [{ ...state, durations: { ...state.durations, [phase]: ms } }, NO_EFFECTS];
 		}
 		case "selectPhase":
 			if (run || event.phase === state.phase) return [state, NO_EFFECTS];

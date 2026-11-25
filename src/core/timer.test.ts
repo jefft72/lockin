@@ -2,14 +2,17 @@ import { describe, expect, it } from "vitest";
 import {
 	canBank,
 	clampDuration,
+	elapsedMs,
 	initialState,
 	MAX_DURATION,
 	MINUTE,
 	parseState,
-	progress,
+	reading,
 	reduce,
 	remainingMs,
 	SECOND,
+	STOPWATCH_CAP,
+	stretchesDone,
 	type TimerEffect,
 	type TimerEvent,
 	type TimerState,
@@ -35,7 +38,8 @@ const tick = (now: number): TimerEvent => ({ type: "tick", now });
 describe("idle", () => {
 	it("is armed at the phase duration", () => {
 		expect(remainingMs(initialState, T0)).toBe(25 * MINUTE);
-		expect(progress(initialState, T0)).toBe(0);
+		expect(elapsedMs(initialState, T0)).toBe(0);
+		expect(stretchesDone(initialState, T0)).toBe(0);
 	});
 
 	it("adjusts the duration of the selected phase only", () => {
@@ -71,7 +75,8 @@ describe("running", () => {
 	it("counts down against the wall clock", () => {
 		const [state] = play(initialState, start(T0));
 		expect(remainingMs(state, T0 + 10 * MINUTE)).toBe(15 * MINUTE);
-		expect(progress(state, T0 + 10 * MINUTE)).toBeCloseTo(0.4);
+		expect(elapsedMs(state, T0 + 10 * MINUTE)).toBe(10 * MINUTE);
+		expect(stretchesDone(state, T0 + 10 * MINUTE)).toBeCloseTo(1.6);
 	});
 
 	it("freezes while paused and resumes with the same time left", () => {
@@ -112,15 +117,15 @@ describe("checkpoints", () => {
 			tick(T0 + 3 * quarter),
 		);
 		expect(effects).toEqual([
-			{ type: "checkpoint", index: 1 },
-			{ type: "checkpoint", index: 2 },
-			{ type: "checkpoint", index: 3 },
+			{ type: "checkpoint", index: 1, atMs: quarter },
+			{ type: "checkpoint", index: 2, atMs: 2 * quarter },
+			{ type: "checkpoint", index: 3, atMs: 3 * quarter },
 		]);
 	});
 
 	it("announces only the latest checkpoint after a long gap", () => {
 		const [, effects] = play(initialState, start(T0), tick(T0 + 20 * MINUTE));
-		expect(effects).toEqual([{ type: "checkpoint", index: 3 }]);
+		expect(effects).toEqual([{ type: "checkpoint", index: 3, atMs: 18.75 * MINUTE }]);
 	});
 
 	it("does not checkpoint breaks", () => {
@@ -230,6 +235,115 @@ describe("banking early", () => {
 	it("is refused during breaks", () => {
 		const [onBreak] = play(initialState, { type: "selectPhase", phase: "break" }, start(T0));
 		expect(canBank(onBreak, T0 + 3 * MINUTE)).toBe(false);
+	});
+});
+
+describe("reading", () => {
+	it("rounds a countdown up, so the last second shows until it is fully spent", () => {
+		expect(reading(initialState, T0)).toEqual({ seconds: 25 * 60, counting: "down" });
+		const [running] = play(initialState, start(T0));
+		expect(reading(running, T0 + 1).seconds).toBe(25 * 60);
+		expect(reading(running, T0 + SECOND).seconds).toBe(25 * 60 - 1);
+		expect(reading(running, T0 + 25 * MINUTE - 1).seconds).toBe(1);
+		expect(reading(running, T0 + 25 * MINUTE).seconds).toBe(0);
+	});
+
+	it("rounds a stopwatch down, so a second shows only once it has passed", () => {
+		const [armed] = play(initialState, { type: "selectPhase", phase: "stopwatch" });
+		expect(reading(armed, T0)).toEqual({ seconds: 0, counting: "up" });
+		const [running] = play(armed, start(T0));
+		expect(reading(running, T0 + SECOND - 1).seconds).toBe(0);
+		expect(reading(running, T0 + SECOND).seconds).toBe(1);
+		expect(reading(running, T0 + 61 * MINUTE + 500).seconds).toBe(61 * 60);
+	});
+});
+
+describe("stopwatch", () => {
+	const [armed] = play(initialState, { type: "selectPhase", phase: "stopwatch" });
+
+	it("has no length to set", () => {
+		expect(reduce(armed, { type: "setDuration", ms: 50 * MINUTE })[0]).toBe(armed);
+	});
+
+	it("freezes while paused and carries on from where it was", () => {
+		const [paused] = play(armed, start(T0), { type: "pause", now: T0 + 10 * MINUTE });
+		expect(elapsedMs(paused, T0 + 60 * MINUTE)).toBe(10 * MINUTE);
+		const [resumed] = play(paused, start(T0 + 60 * MINUTE));
+		expect(elapsedMs(resumed, T0 + 61 * MINUTE)).toBe(11 * MINUTE);
+	});
+
+	it("announces 25, 50 and 90 minutes", () => {
+		const [, effects] = play(
+			armed,
+			start(T0),
+			tick(T0 + 25 * MINUTE - 1),
+			tick(T0 + 25 * MINUTE),
+			tick(T0 + 50 * MINUTE),
+			tick(T0 + 89 * MINUTE),
+			tick(T0 + 90 * MINUTE),
+			tick(T0 + 170 * MINUTE),
+		);
+		expect(effects).toEqual([
+			{ type: "checkpoint", index: 1, atMs: 25 * MINUTE },
+			{ type: "checkpoint", index: 2, atMs: 50 * MINUTE },
+			{ type: "checkpoint", index: 3, atMs: 90 * MINUTE },
+		]);
+	});
+
+	it("fills each stretch at its own pace", () => {
+		const [running] = play(armed, start(T0));
+		expect(stretchesDone(running, T0 + 12.5 * MINUTE)).toBeCloseTo(0.5);
+		expect(stretchesDone(running, T0 + 25 * MINUTE)).toBe(1);
+		expect(stretchesDone(running, T0 + 70 * MINUTE)).toBeCloseTo(2.5);
+		expect(stretchesDone(running, T0 + 135 * MINUTE)).toBeCloseTo(3.5);
+		expect(stretchesDone(running, T0 + 999 * MINUTE)).toBe(4);
+	});
+
+	it("cannot be banked before a minute is in", () => {
+		const [running] = play(armed, start(T0));
+		expect(canBank(running, T0 + 59 * SECOND)).toBe(false);
+		expect(canBank(running, T0 + MINUTE)).toBe(true);
+	});
+
+	it("banks the time on the clock and stays where it is", () => {
+		const [state, effects] = play(
+			armed,
+			start(T0),
+			{ type: "pause", now: T0 + 40 * MINUTE },
+			start(T0 + 60 * MINUTE),
+			{ type: "bank", now: T0 + 70 * MINUTE },
+		);
+		// No break is owed and the pomodoro cycle has not moved.
+		expect(state).toEqual(armed);
+		expect(effects.at(-1)).toEqual({
+			type: "finished",
+			phase: "stopwatch",
+			session: {
+				id: "run-1",
+				startedAt: T0,
+				endedAt: T0 + 70 * MINUTE,
+				focusMs: 50 * MINUTE,
+				plannedMs: 0,
+				kind: "stopwatch",
+			},
+		});
+	});
+
+	it("banks itself at the cap, however long it was left running", () => {
+		const [state, effects] = play(armed, start(T0), tick(T0 + 14 * 60 * MINUTE));
+		expect(state).toEqual(armed);
+		expect(effects.at(-1)).toMatchObject({
+			type: "finished",
+			session: { focusMs: STOPWATCH_CAP, endedAt: T0 + STOPWATCH_CAP, kind: "stopwatch" },
+		});
+	});
+
+	it("round-trips through JSON mid-run", () => {
+		const [running] = play(armed, start(T0), tick(T0 + 30 * MINUTE));
+		const [paused] = play(running, { type: "pause", now: T0 + 31 * MINUTE });
+		for (const state of [armed, running, paused]) {
+			expect(parseState(JSON.parse(JSON.stringify(state)))).toEqual(state);
+		}
 	});
 });
 

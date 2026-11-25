@@ -6,9 +6,10 @@ import {
 	initialState,
 	MINUTE,
 	PHASES,
+	type Phase,
 	parseState,
+	reading,
 	reduce,
-	remainingMs,
 	type SessionRecord,
 	STRETCHES,
 	type TimerEffect,
@@ -26,6 +27,14 @@ import { Board } from "./ui/board.ts";
 import { button } from "./ui/dom.ts";
 import { NowPlayingView } from "./ui/now-playing.ts";
 import { Stage } from "./ui/stage.ts";
+
+/** What the tab title calls each phase while it runs. */
+const TITLES: Record<Phase, string> = {
+	focus: "focus",
+	break: "break",
+	longBreak: "break",
+	stopwatch: "stopwatch",
+};
 
 /** How long typed digits keep accumulating into one number of minutes. */
 const TYPING_WINDOW_MS = 1500;
@@ -90,7 +99,10 @@ export function startApp(root: HTMLElement): void {
 		reset: () => dispatch({ type: "reset" }),
 		bank: () => dispatch({ type: "bank", now: Date.now() }),
 		adjust: (deltaMs) => {
-			dispatch({ type: "setDuration", ms: state.durations[state.phase] + deltaMs });
+			const { phase } = state;
+			// The stopwatch has no length to adjust.
+			if (phase === "stopwatch") return;
+			dispatch({ type: "setDuration", ms: state.durations[phase] + deltaMs });
 		},
 		setDuration: (ms) => dispatch({ type: "setDuration", ms }),
 		selectPhase: (phase) => dispatch({ type: "selectPhase", phase }),
@@ -184,8 +196,8 @@ export function startApp(root: HTMLElement): void {
 	function render(spin: boolean): void {
 		const now = Date.now();
 		stage.render(state, now, spin);
-		const label = state.phase === "focus" ? "focus" : "break";
-		document.title = state.run ? `${clockText(remainingMs(state, now))} ${label}` : "lockin";
+		const { seconds } = reading(state, now);
+		document.title = state.run ? `${clockText(seconds)} ${TITLES[state.phase]}` : "lockin";
 		awake.set(state.run?.clock.kind === "running");
 		nowPlaying.tick(now);
 		// The bank is drawn relative to today, so it turns over at midnight.
@@ -200,7 +212,11 @@ export function startApp(root: HTMLElement): void {
 			case "checkpoint":
 				chime.checkpoint();
 				stage.markCheckpoint(effect.index);
-				stage.announce(`checkpoint ${effect.index}/${STRETCHES - 1}`);
+				stage.announce(
+					state.phase === "stopwatch"
+						? `${spanText(effect.atMs)} in`
+						: `checkpoint ${effect.index}/${STRETCHES - 1}`,
+				);
 				break;
 			case "finished":
 				chime.finish();

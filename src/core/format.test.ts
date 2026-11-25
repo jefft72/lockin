@@ -2,18 +2,16 @@ import { describe, expect, it } from "vitest";
 import { clockDigits, clockText, spanText } from "./format.ts";
 import { MINUTE, SECOND } from "./timer.ts";
 
-describe("clockDigits", () => {
-	it("rounds up so the last second is shown until it is fully spent", () => {
-		expect(clockText(25 * MINUTE)).toBe("25:00");
-		expect(clockText(25 * MINUTE - 1)).toBe("25:00");
-		expect(clockText(24 * MINUTE + 59 * SECOND)).toBe("24:59");
-		expect(clockText(1)).toBe("00:01");
+describe("clockText", () => {
+	it("pads minutes and seconds to two digits", () => {
+		expect(clockText(25 * 60)).toBe("25:00");
+		expect(clockText(24 * 60 + 59)).toBe("24:59");
+		expect(clockText(61)).toBe("01:01");
 		expect(clockText(0)).toBe("00:00");
-		expect(clockText(-500)).toBe("00:00");
 	});
 
 	it("grows a third minute digit past 99 minutes", () => {
-		expect(clockDigits(180 * MINUTE)).toEqual({ minutes: "180", seconds: "00" });
+		expect(clockDigits(180 * 60)).toEqual({ minutes: "180", seconds: "00" });
 	});
 });
 

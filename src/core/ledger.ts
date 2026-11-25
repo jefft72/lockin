@@ -83,7 +83,7 @@ function parseEntry(value: unknown): LedgerEntry | null {
 	if (typeof v.id !== "string" || v.id === "") return null;
 	if (!isCount(v.seq) || !isCount(v.startedAt) || !isCount(v.endedAt)) return null;
 	if (!isCount(v.focusMs) || !isCount(v.plannedMs)) return null;
-	if (v.kind !== "full" && v.kind !== "partial") return null;
+	if (v.kind !== "full" && v.kind !== "partial" && v.kind !== "stopwatch") return null;
 	if (!isHash(v.prev) || !isHash(v.hash)) return null;
 	return {
 		id: v.id,

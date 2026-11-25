@@ -95,9 +95,22 @@ button:focus-visible {
 	gap: 2ch;
 }
 
+.phases {
+	flex: none;
+	flex-wrap: nowrap;
+}
+
 .keys {
 	color: var(--faint);
 	text-align: right;
+	white-space: nowrap;
+}
+
+/* The hint is a single line or nothing: it goes once it would crowd the tabs. */
+@media (max-width: 1240px) {
+	.keys {
+		display: none;
+	}
 }
 
 .centre {
@@ -496,10 +509,6 @@ button:focus-visible {
 
 	.stage {
 		padding: 1.5rem;
-	}
-
-	.keys {
-		display: none;
 	}
 
 	.stage-footer {
